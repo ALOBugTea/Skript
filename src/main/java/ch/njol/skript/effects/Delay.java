@@ -80,7 +80,7 @@ public class Delay extends Effect {
 		debug(e, true);
 		final long start = Skript.debug() ? System.nanoTime() : 0;
 		final TriggerItem next = getNext();
-		if (next != null) {
+		if (next != null && Skript.getInstance().isEnabled()) {
 			// Back up local variables
 			Object localVars = Variables.removeLocals(e);
 
