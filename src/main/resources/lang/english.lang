@@ -991,6 +991,7 @@ teleport causes:
 	plugin: plugin
 	spectate: spectate, spectator
 	unknown: unknown
+    exit_bed: exit bed, exiting bed, bed exit
 
 # -- Game Modes --
 game modes:
