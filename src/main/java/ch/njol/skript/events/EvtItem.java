@@ -21,6 +21,7 @@ package ch.njol.skript.events;
 
 import org.bukkit.event.Event;
 import org.bukkit.event.block.BlockDispenseEvent;
+import org.bukkit.event.entity.ItemDespawnEvent;
 import org.bukkit.event.entity.ItemSpawnEvent;
 import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -90,6 +91,13 @@ public class EvtItem extends SkriptEvent {
 				.description("Called when clicking on inventory slot.")
 				.examples("")
 				.since("2.2-Fixes-V10");
+
+		Skript.registerEvent("Item Despawn", EvtItem.class, ItemDespawnEvent.class, "(item[ ][stack]|[item] %-itemtypes%) despawn[ing]", "[item[ ][stack]] despawn[ing] [[of] %-itemtypes%]")
+				.description("Called when an item is about to be despawned from the world, usually 5 minutes after it was dropped.")
+				.examples("on item despawn of diamond:",
+						"	send \"Not my precious!\"",
+						"	cancel event")
+				.since("2.2-dev35");
 	}
 	
 	@Nullable

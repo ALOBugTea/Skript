@@ -62,7 +62,32 @@ public class EventValues {
 	private final static List<EventValueInfo<?, ?>> defaultEventValues = new ArrayList<EventValueInfo<?, ?>>(30);
 	private final static List<EventValueInfo<?, ?>> futureEventValues = new ArrayList<EventValueInfo<?, ?>>();
 	private final static List<EventValueInfo<?, ?>> pastEventValues = new ArrayList<EventValueInfo<?, ?>>();
-	
+
+	/**
+	 * The past time of an event value. Represented by "past" or "former".
+	 */
+	public static final int TIME_PAST = -1;
+
+	/**
+	 * The current time of an event value.
+	 */
+	public static final int TIME_NOW = 0;
+
+	/**
+	 * The future time of an event value.
+	 */
+	public static final int TIME_FUTURE = 1;
+
+	/**
+	 * Get Event Values list for the specified time
+	 * @param time The time of the event values. One of
+	 * {@link EventValues#TIME_PAST}, {@link EventValues#TIME_NOW} or {@link EventValues#TIME_FUTURE}.
+	 * @return An immutable copy of the event values list for the specified time
+	 */
+// FIXME com.google.common.collect.ImmutableList doesn't exists in this version
+//	public static List<EventValueInfo<?, ?>> getEventValuesListForTime(int time) {
+//		return ImmutableList.copyOf(getEventValuesList(time));
+//	}
 	private final static List<EventValueInfo<?, ?>> getEventValuesList(final int time) {
 		if (time == -1)
 			return pastEventValues;
@@ -213,7 +238,7 @@ public class EventValues {
 	}
 	
 	private final static boolean checkExcludes(final EventValueInfo<?, ?> ev, final Class<? extends Event> e) {
-		final Class<? extends Event>[] excl = ev.exculdes;
+		final Class<? extends Event>[] excl = (Class<? extends Event>[]) ev.exculdes;
 		if (excl == null)
 			return true;
 		for (final Class<? extends Event> ex : excl) {
