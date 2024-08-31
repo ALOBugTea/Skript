@@ -452,8 +452,8 @@ public abstract class Variables {
 		final SerializedVariable.Value var = serialize(value);
 		return new SerializedVariable(name, var);
 	}
-	
 
+	@Nullable
 	public final static SerializedVariable.Value serialize(final @Nullable Object value) {
 		assert Bukkit.isPrimaryThread();
 		return Classes.serialize(value);
