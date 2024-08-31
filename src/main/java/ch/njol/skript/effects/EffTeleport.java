@@ -40,24 +40,22 @@ import ch.njol.skript.util.Direction;
 import ch.njol.skript.util.Utils;
 import ch.njol.util.Kleenean;
 
-/**
- * @author Peter Güttinger
- */
 @Name("Teleport")
 @Description("Teleport an entity to a specific location.")
 @Examples({"teleport the player to {homes.%player%}",
 		"teleport the attacker to the victim"})
 @Since("1.0")
 public class EffTeleport extends Effect {
+
 	static {
 		Skript.registerEffect(EffTeleport.class, "teleport %entities% (to|%direction%) %location%");
 	}
-	
+
 	@SuppressWarnings("null")
 	private Expression<Entity> entities;
 	@SuppressWarnings("null")
 	private Expression<Location> location;
-	
+
 	@SuppressWarnings({"unchecked", "null"})
 	@Override
 	public boolean init(final Expression<?>[] exprs, final int matchedPattern, final Kleenean isDelayed, final ParseResult parser) {
