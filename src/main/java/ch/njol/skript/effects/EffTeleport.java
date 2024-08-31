@@ -88,7 +88,8 @@ public class EffTeleport extends Effect {
 			} else {
 				loc = to;
 			}
-			loc.getChunk().load();
+			if (!loc.getChunk().isLoaded())
+				loc.getChunk().load();
 			if (e instanceof PlayerRespawnEvent && entity.equals(((PlayerRespawnEvent) e).getPlayer()) && !Delay.isDelayed(e)) {
 				((PlayerRespawnEvent) e).setRespawnLocation(loc);
 			} else {
