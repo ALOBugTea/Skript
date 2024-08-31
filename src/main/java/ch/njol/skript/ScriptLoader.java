@@ -22,13 +22,8 @@ package ch.njol.skript;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.file.FileSystem;
-import java.nio.file.FileSystems;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -881,7 +876,10 @@ final public class ScriptLoader {
 		
 		return new ScriptInfo(); // Return that we unloaded literally nothing
 	}
-	
+
+	/**
+	 * Replaces options in a string.
+	 */
 	public final static String replaceOptions(final String s) {
 		final String r = StringUtils.replaceAll(s, "\\{@(.+?)\\}", new Callback<String, Matcher>() {
 			@Override
@@ -892,7 +890,7 @@ final public class ScriptLoader {
 					Skript.error("undefined option " + m.group());
 					return m.group();
 				}
-				return option;
+				return Matcher.quoteReplacement(option);
 			}
 		});
 		assert r != null;

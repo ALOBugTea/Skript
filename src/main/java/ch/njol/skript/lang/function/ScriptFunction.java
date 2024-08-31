@@ -19,10 +19,7 @@
  */
 package ch.njol.skript.lang.function;
 
-import org.eclipse.jdt.annotation.Nullable;
-
 import ch.njol.skript.ScriptLoader;
-import ch.njol.skript.Skript;
 import ch.njol.skript.classes.ClassInfo;
 import ch.njol.skript.config.SectionNode;
 import ch.njol.skript.effects.EffReturn;
@@ -31,6 +28,7 @@ import ch.njol.skript.lang.function.Functions.FunctionData;
 import ch.njol.skript.lang.util.SimpleEvent;
 import ch.njol.skript.variables.Variables;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.eclipse.jdt.annotation.Nullable;
 
 /**
  * @author Peter Güttinger
@@ -82,7 +80,7 @@ public class ScriptFunction<T> extends Function<T> {
 		for (int i = 0; i < parameters.length; i++) {
 			final Parameter<?> p = parameters[i];
 			final Object[] val = params[i];
-			if (p.single) {
+			if (p.single && val.length > 0) {
 				Variables.setVariable(p.name, val[0], e, true);
 			} else {
 				for (int j = 0; j < val.length; j++) {
@@ -93,8 +91,14 @@ public class ScriptFunction<T> extends Function<T> {
 		
 		assert trigger != null;
 		trigger.execute(e);
-		returnValueSet = false;
 		return returnValue;
 	}
-	
+
+	@Override
+	public boolean resetReturnValue() {
+		returnValue = null;
+		returnValueSet = false;
+		return true;
+	}
+
 }

@@ -28,7 +28,7 @@ import ch.njol.skript.classes.ClassInfo;
 import ch.njol.util.coll.CollectionUtils;
 
 /**
- * @author Peter Güttinger
+ * Functions can be called using arguments.
  */
 public abstract class Function<T> {
 	
@@ -121,8 +121,16 @@ public abstract class Function<T> {
 	 * @return Whatever this function is supposed to return. May be null or empty, but must not contain null elements.
 	 */
 	@Nullable
-	public abstract T[] execute(FunctionEvent e, final Object[][] params);
-	
+	public abstract T[] execute(FunctionEvent<?> e, final Object[][] params);
+
+	/**
+	 * Resets the return value of the {@code Function}.
+	 * Should be called right after execution.
+	 *
+	 * @return Whether or not the return value was successfully reset
+	 */
+	public abstract boolean resetReturnValue();
+
 	@Override
 	public String toString() {
 		return "function " + name;

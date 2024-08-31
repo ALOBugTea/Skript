@@ -169,7 +169,18 @@ public class FunctionReference<T> {
 		
 		return true;
 	}
-	
+
+	@Nullable
+	public Function<? extends T> getFunction() {
+		return function;
+	}
+
+	public boolean resetReturnValue() {
+		if (function != null)
+			return function.resetReturnValue();
+		return false;
+	}
+
 	@SuppressWarnings("unchecked")
 	@Nullable
 	protected T[] execute(final Event e) {
@@ -201,6 +212,7 @@ public class FunctionReference<T> {
 				}
 			}
 		}
+
 		assert function != null;
 		return function.execute(params);
 	}
