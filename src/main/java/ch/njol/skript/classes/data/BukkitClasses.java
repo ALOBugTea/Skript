@@ -1001,9 +1001,15 @@ public class BukkitClasses {
 							Skript.error("'" + s + "' represents multiple materials");
 							return null;
 						}
-
+						if (!t.getTypes().get(0).hasDataRange())
+							return t.getRandom();
+						if (t.getTypes().get(0).dataMin > 0) {
+							Skript.error("'" + s + "' represents multiple materials");
+							return null;
+						}
 						final ItemStack i = t.getRandom();
 						assert i != null;
+						i.setDurability((short) 0);
 						return i;
 					}
 					
