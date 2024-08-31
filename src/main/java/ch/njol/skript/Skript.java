@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.net.URL;
@@ -53,6 +54,7 @@ import java.util.zip.ZipFile;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Server;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
@@ -60,6 +62,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.event.server.ServerCommandEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginDescriptionFile;
@@ -164,7 +167,8 @@ public final class Skript extends JavaPlugin implements Listener {
 	private static Skript instance = null;
 	
 	private static boolean disabled = false;
-	
+	private static boolean partDisabled = false;
+
 	public static Skript getInstance() {
 		final Skript i = instance;
 		if (i == null)
@@ -192,17 +196,16 @@ public final class Skript extends JavaPlugin implements Listener {
 			m_finished_loading = new Message("skript.finished loading");
 	
 	public static ServerPlatform getServerPlatform() {
-		if (classExists("co.aikar.timings.Timings")) {
+		if (classExists("net.glowstone.GlowServer")) {
+			return ServerPlatform.BUKKIT_GLOWSTONE; // Glowstone has timings too, so must check for it first
+		} else if (classExists("co.aikar.timings.Timings")) {
 			return ServerPlatform.BUKKIT_PAPER; // Could be Sponge, but it doesn't work at all at the moment
 		} else if (classExists("org.spigotmc.SpigotConfig")) {
-			if (classExists("java.net.glowstone.GlowServer")) {
-				return ServerPlatform.BUKKIT_GLOWSTONE;
-			} else {
-				return ServerPlatform.BUKKIT_SPIGOT;
-			}
-		} else if (classExists("org.bukkit.craftbukkit.CraftServer")) {
+			return ServerPlatform.BUKKIT_SPIGOT;
+		} else if (classExists("org.bukkit.craftbukkit.CraftServer") || classExists("org.bukkit.craftbukkit.Main")) {
+			// At some point, CraftServer got removed or moved
 			return ServerPlatform.BUKKIT_CRAFTBUKKIT;
-		} else {
+		} else { // Probably some ancient Bukkit implementation
 			return ServerPlatform.BUKKIT_UNKNOWN;
 		}
 	}
@@ -230,6 +233,7 @@ public final class Skript extends JavaPlugin implements Listener {
 	
 	@Override
 	public void onEnable() {
+		Bukkit.getPluginManager().registerEvents(this, this);
 		if (disabled) {
 			Skript.error(m_invalid_reload.toString());
 			setEnabled(false);
@@ -628,7 +632,7 @@ public final class Skript extends JavaPlugin implements Listener {
 	 * @deprecated use {@link #classExists(String)}
 	 */
 	@Deprecated
-	public final static boolean supports(final String className) {
+	public static boolean supports(final String className) {
 		return classExists(className);
 	}
 	
@@ -638,7 +642,7 @@ public final class Skript extends JavaPlugin implements Listener {
 	 * @param className The {@link Class#getCanonicalName() canonical name} of the class
 	 * @return Whether the given class exists.
 	 */
-	public final static boolean classExists(final String className) {
+	public static boolean classExists(final String className) {
 		try {
 			Class.forName(className);
 			return true;
@@ -655,7 +659,7 @@ public final class Skript extends JavaPlugin implements Listener {
 	 * @param parameterTypes The parameter types of the method
 	 * @return Whether the given method exists.
 	 */
-	public final static boolean methodExists(final Class<?> c, final String methodName, final Class<?>... parameterTypes) {
+	public static boolean methodExists(final Class<?> c, final String methodName, final Class<?>... parameterTypes) {
 		try {
 			c.getDeclaredMethod(methodName, parameterTypes);
 			return true;
@@ -677,7 +681,7 @@ public final class Skript extends JavaPlugin implements Listener {
 	 * @param returnType The expected return type
 	 * @return Whether the given method exists.
 	 */
-	public final static boolean methodExists(final Class<?> c, final String methodName, final Class<?>[] parameterTypes, final Class<?> returnType) {
+	public static boolean methodExists(final Class<?> c, final String methodName, final Class<?>[] parameterTypes, final Class<?> returnType) {
 		try {
 			final Method m = c.getDeclaredMethod(methodName, parameterTypes);
 			return m.getReturnType() == returnType;
@@ -695,7 +699,7 @@ public final class Skript extends JavaPlugin implements Listener {
 	 * @param fieldName The name of the field
 	 * @return Whether the given field exists.
 	 */
-	public final static boolean fieldExists(final Class<?> c, final String fieldName) {
+	public static boolean fieldExists(final Class<?> c, final String fieldName) {
 		try {
 			c.getDeclaredField(fieldName);
 			return true;
@@ -772,17 +776,96 @@ public final class Skript extends JavaPlugin implements Listener {
 	public static void closeOnDisable(final Closeable closeable) {
 		closeOnDisable.add(closeable);
 	}
-	
+
+	@SuppressWarnings("unused")
+	@EventHandler
+	public void onPluginDisable(PluginDisableEvent event) {
+		Plugin plugin = event.getPlugin();
+		PluginDescriptionFile descriptionFile = plugin.getDescription();
+		if (descriptionFile.getDepend().contains("Skript") || descriptionFile.getSoftDepend().contains("Skript")) {
+			// An addon being disabled, check if server is being stopped
+			if (!isServerRunning()) {
+				Skript.info("Part Disabling Skript due to " + plugin.getName() + " being disabled!");
+				beforeDisable();
+			}
+		}
+	}
+
+	private static final boolean IS_STOPPING_EXISTS;
+	@Nullable
+	private static Method IS_RUNNING;
+	@Nullable
+	private static Object MC_SERVER;
+
+	static {
+		IS_STOPPING_EXISTS = methodExists(Server.class, "isStopping");
+
+		if (!IS_STOPPING_EXISTS) {
+			Server server = Bukkit.getServer();
+			if (server != null) {
+				Class<?> clazz = server.getClass();
+
+				Method serverMethod;
+				try {
+					serverMethod = clazz.getMethod("getServer");
+				} catch (NoSuchMethodException e) {
+					throw new RuntimeException(e);
+				}
+
+				try {
+					MC_SERVER = serverMethod.invoke(server);
+				} catch (IllegalAccessException | InvocationTargetException e) {
+					throw new RuntimeException(e);
+				}
+
+				try {
+					if (MC_SERVER != null)
+						IS_RUNNING = MC_SERVER.getClass().getMethod("isRunning");
+				} catch (NoSuchMethodException e) {
+					throw new RuntimeException(e);
+				}
+			}
+		}
+	}
+
+	@SuppressWarnings("ConstantConditions")
+	private boolean isServerRunning() {
+
+		// Bukkit.getServer().isStopping() doesn't exists in 1.11.2
+		// So it could be Terrible when Addon trying to disabled self!
+		// but we can't do anything about it here...
+
+//		if (IS_STOPPING_EXISTS)
+//			return !Bukkit.getServer().isStopping();
+
+		try {
+			if (IS_RUNNING!= null && MC_SERVER!= null)
+				return (boolean) IS_RUNNING.invoke(MC_SERVER);
+			else
+				return true; // Part Disabled wouldn't work if no other method found
+		} catch (IllegalAccessException | InvocationTargetException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+
+	private void beforeDisable() {
+		partDisabled = true;
+		EvtSkript.onSkriptStop(); // TODO [code style] warn user about delays in Skript stop events
+
+		disableScripts(); // This version doesn't have any handle in ScriptLoader, Change back to old usage.
+	}
+
 	@Override
 	public void onDisable() {
 		if (disabled)
 			return;
 		disabled = true;
-		
-		EvtSkript.onSkriptStop(); // TODO [code style] warn user about delays in Skript stop events
-		
-		disableScripts();
-		
+
+		if (!partDisabled) {
+			beforeDisable();
+		}
+
 		Bukkit.getScheduler().cancelTasks(this);
 		
 		for (final Closeable c : closeOnDisable) {
@@ -844,7 +927,7 @@ public final class Skript extends JavaPlugin implements Listener {
 	public final static int MAXDATAVALUE = Short.MAX_VALUE - Short.MIN_VALUE;
 	
 	// TODO localise Infinity, -Infinity, NaN (and decimal point?)
-	public final static String toString(final double n) {
+	public static String toString(final double n) {
 		return StringUtils.toString(n, SkriptConfig.numberAccuracy.value());
 	}
 	
@@ -858,7 +941,7 @@ public final class Skript extends JavaPlugin implements Listener {
 	/**
 	 * Creates a new Thread and sets its UncaughtExceptionHandler. The Thread is not started automatically.
 	 */
-	public final static Thread newThread(final Runnable r, final String name) {
+	public static Thread newThread(final Runnable r, final String name) {
 		final Thread t = new Thread(r, name);
 		t.setUncaughtExceptionHandler(UEH);
 		return t;
@@ -1076,7 +1159,7 @@ public final class Skript extends JavaPlugin implements Listener {
 	 * @param command
 	 * @return Whether the command was run
 	 */
-	public final static boolean dispatchCommand(final CommandSender sender, final String command) {
+	public static boolean dispatchCommand(final CommandSender sender, final String command) {
 		try {
 			if (sender instanceof Player) {
 				final PlayerCommandPreprocessEvent e = new PlayerCommandPreprocessEvent((Player) sender, "/" + command);
@@ -1099,27 +1182,27 @@ public final class Skript extends JavaPlugin implements Listener {
 	
 	// ================ LOGGING ================
 	
-	public final static boolean logNormal() {
+	public static boolean logNormal() {
 		return SkriptLogger.log(Verbosity.NORMAL);
 	}
 	
-	public final static boolean logHigh() {
+	public static boolean logHigh() {
 		return SkriptLogger.log(Verbosity.HIGH);
 	}
 	
-	public final static boolean logVeryHigh() {
+	public static boolean logVeryHigh() {
 		return SkriptLogger.log(Verbosity.VERY_HIGH);
 	}
 	
-	public final static boolean debug() {
+	public static boolean debug() {
 		return SkriptLogger.debug();
 	}
 	
-	public final static boolean testing() {
+	public static boolean testing() {
 		return debug() || Skript.class.desiredAssertionStatus();
 	}
 	
-	public final static boolean log(final Verbosity minVerb) {
+	public static boolean log(final Verbosity minVerb) {
 		return SkriptLogger.log(minVerb);
 	}
 	
@@ -1173,19 +1256,19 @@ public final class Skript extends JavaPlugin implements Listener {
 	 * @param info Description of the error and additional information
 	 * @return an EmptyStacktraceException to throw if code execution should terminate.
 	 */
-	public final static EmptyStacktraceException exception(final String... info) {
+	public static EmptyStacktraceException exception(final String... info) {
 		return exception(null, info);
 	}
 	
-	public final static EmptyStacktraceException exception(final @Nullable Throwable cause, final String... info) {
+	public static EmptyStacktraceException exception(final @Nullable Throwable cause, final String... info) {
 		return exception(cause, null, null, info);
 	}
 	
-	public final static EmptyStacktraceException exception(final @Nullable Throwable cause, final @Nullable Thread thread, final String... info) {
+	public static EmptyStacktraceException exception(final @Nullable Throwable cause, final @Nullable Thread thread, final String... info) {
 		return exception(cause, thread, null, info);
 	}
 	
-	public final static EmptyStacktraceException exception(final @Nullable Throwable cause, final @Nullable TriggerItem item, final String... info) {
+	public static EmptyStacktraceException exception(final @Nullable Throwable cause, final @Nullable TriggerItem item, final String... info) {
 		return exception(cause, null, item, info);
 	}
 	
@@ -1195,7 +1278,12 @@ public final class Skript extends JavaPlugin implements Listener {
 	 */
 	private static Map<String, PluginDescriptionFile> pluginPackages = new HashMap<>();
 	private static boolean checkedPlugins = false;
-	
+
+	/**
+	 * Set to true when an exception is thrown.
+	 */
+	private static boolean errored = false;
+
 	/**
 	 * Used if something happens that shouldn't happen
 	 * 
@@ -1203,8 +1291,8 @@ public final class Skript extends JavaPlugin implements Listener {
 	 * @param info Description of the error and additional information
 	 * @return an EmptyStacktraceException to throw if code execution should terminate.
 	 */
-	public final static EmptyStacktraceException exception(@Nullable Throwable cause, final @Nullable Thread thread, final @Nullable TriggerItem item, final String... info) {
-		
+	public static EmptyStacktraceException exception(@Nullable Throwable cause, final @Nullable Thread thread, final @Nullable TriggerItem item, final String... info) {
+		errored = true;
 		// First error: gather plugin package information
 		if (!checkedPlugins) { 
 			for (Plugin plugin : Bukkit.getPluginManager().getPlugins()) {
