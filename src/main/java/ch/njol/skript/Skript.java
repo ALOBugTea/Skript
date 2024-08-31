@@ -790,6 +790,17 @@ public final class Skript extends JavaPlugin implements Listener {
 			}
 		}
 	}
+	@SuppressWarnings("unused")
+	@EventHandler
+	public void onServerStopByCommand(ServerCommandEvent event) {
+		boolean isStopping = event.getCommand().equalsIgnoreCase("stop") ||
+							 event.getCommand().equalsIgnoreCase("restart");
+		if (isStopping && !isServerStopByCommand) {
+			isServerStopByCommand = true; // Trigger only once time
+        }
+	}
+
+	private static boolean isServerStopByCommand = false;
 
 	private static final boolean IS_STOPPING_EXISTS;
 	@Nullable
@@ -839,10 +850,10 @@ public final class Skript extends JavaPlugin implements Listener {
 //			return !Bukkit.getServer().isStopping();
 
 		try {
-			if (IS_RUNNING!= null && MC_SERVER!= null)
+            // Part Disabled wouldn't work if no other method found
+            if (IS_RUNNING != null && MC_SERVER != null)
 				return (boolean) IS_RUNNING.invoke(MC_SERVER);
-			else
-				return true; // Part Disabled wouldn't work if no other method found
+			else return !isServerStopByCommand;
 		} catch (IllegalAccessException | InvocationTargetException e) {
 			throw new RuntimeException(e);
 		}
