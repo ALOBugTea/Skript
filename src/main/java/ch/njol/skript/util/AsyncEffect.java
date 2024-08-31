@@ -58,14 +58,15 @@ public abstract class AsyncEffect extends Effect {
 	        	@SuppressWarnings("synthetic-access")
 			@Override
 	            	public void run() {
-					// Re-set local variables
-					if (localVars != null)
-						Variables.setLocalVariables(e, localVars);
 					execute(e); // Execute this effect
-	                	if (next != null) {
+	                	if (next != null && Skript.getInstance().isEnabled()) { // See https://github.com/SkriptLang/Skript/issues/3702
 					Bukkit.getScheduler().runTask(Skript.getInstance(), new Runnable() {
 						@Override
 						public void run() { // Walk to next item synchronously
+							// Re-set local variables
+							if (localVars != null)
+								Variables.setLocalVariables(e, localVars);
+
 							Object timing = null;
 							if (SkriptTimings.enabled()) { // getTrigger call is not free, do it only if we must
 								Trigger trigger = getTrigger();
