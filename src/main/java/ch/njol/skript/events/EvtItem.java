@@ -115,6 +115,8 @@ public class EvtItem extends SkriptEvent {
 	public boolean check(final Event e) {
 		if (e instanceof ItemSpawnEvent) // To make 'last dropped item' possible.
 			EffSpawn.lastSpawned = ((ItemSpawnEvent) e).getEntity();
+		else if (e instanceof ItemDespawnEvent)
+			EffSpawn.lastSpawned = ((ItemDespawnEvent) e).getEntity();
 		if (types == null)
 			return true;
 		final ItemStack is;
@@ -136,6 +138,8 @@ public class EvtItem extends SkriptEvent {
 //			is = ((BrewEvent) e).getContents().getContents()
 		} else if (e instanceof InventoryClickEvent) {
 			is = ((InventoryClickEvent) e).getCurrentItem();
+		} else if (e instanceof ItemDespawnEvent) {
+			is = ((ItemDespawnEvent) e).getEntity().getItemStack();
 		} else {
 			assert false;
 			return false;
