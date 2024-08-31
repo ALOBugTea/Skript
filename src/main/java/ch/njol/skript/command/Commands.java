@@ -36,6 +36,7 @@ import java.util.logging.LogRecord;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import ch.njol.skript.variables.Variables;
 import org.apache.commons.lang.Validate;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -271,7 +272,9 @@ public abstract class Commands {
 					sender.sendMessage(ChatColor.GRAY + "executing '" + ChatColor.stripColor(command) + "'");
 					if (SkriptConfig.logPlayerCommands.value() && !(sender instanceof ConsoleCommandSender))
 						Skript.info(sender.getName() + " issued effect command: " + command);
-					e.run(new EffectCommandEvent(sender, command));
+					EffectCommandEvent effectCommand = new EffectCommandEvent(sender, command);
+					e.run(effectCommand);
+					Variables.removeLocals(effectCommand);
 				} else {
 					if (sender == Bukkit.getConsoleSender()) // log as SEVERE instead of INFO like printErrors below
 						SkriptLogger.LOGGER.severe("Error in: " + ChatColor.stripColor(command));

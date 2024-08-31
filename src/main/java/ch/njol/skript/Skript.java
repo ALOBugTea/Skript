@@ -792,52 +792,7 @@ public final class Skript extends JavaPlugin implements Listener {
 				Skript.exception(e, "An error occurred while shutting down.", "This might or might not cause any issues.");
 			}
 		}
-		
-		// unset static fields to prevent memory leaks as Bukkit reloads the classes with a different classloader on reload
-		// async to not slow down server reload, delayed to not slow down server shutdown
-		final Thread t = newThread(new Runnable() {
-			@SuppressWarnings("synthetic-access")
-			@Override
-			public void run() {
-				try {
-					Thread.sleep(10000);
-				} catch (final InterruptedException e) {}
-				try {
-					final Field modifiers = Field.class.getDeclaredField("modifiers");
-					modifiers.setAccessible(true);
-					final JarFile jar = new JarFile(getFile());
-					try {
-						for (final JarEntry e : new EnumerationIterable<>(jar.entries())) {
-							if (e.getName().endsWith(".class")) {
-								try {
-									final Class<?> c = Class.forName(e.getName().replace('/', '.').substring(0, e.getName().length() - ".class".length()), false, getClassLoader());
-									for (final Field f : c.getDeclaredFields()) {
-										if (Modifier.isStatic(f.getModifiers()) && !f.getType().isPrimitive()) {
-											if (Modifier.isFinal(f.getModifiers())) {
-												modifiers.setInt(f, f.getModifiers() & ~Modifier.FINAL);
-											}
-											f.setAccessible(true);
-											f.set(null, null);
-										}
-									}
-								} catch (final Throwable ex) {
-									if (testing())
-										ex.printStackTrace();
-								}
-							}
-						}
-					} finally {
-						jar.close();
-					}
-				} catch (final Throwable ex) {
-					if (testing())
-						ex.printStackTrace();
-				}
-			}
-		}, "Skript cleanup thread");
-		t.setPriority(Thread.MIN_PRIORITY);
-		t.setDaemon(true);
-		t.start();
+
 	}
 	
 	// ================ CONSTANTS, OPTIONS & OTHER ================

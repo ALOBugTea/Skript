@@ -32,42 +32,107 @@ import ch.njol.skript.util.Utils;
 import ch.njol.util.StringUtils;
 
 final class VariablesMap {
-	
-	final static Comparator<String> variableNameComparator = new Comparator<String>() {
-		@Override
-		public int compare(final @Nullable String s1, final @Nullable String s2) {
-			if (s1 == null)
-				return s2 == null ? 0 : -1;
-			if (s2 == null)
-				return 1;
-			int i = 0, j = 0;
-			while (i < s1.length() && j < s2.length()) {
-				final char c1 = s1.charAt(i), c2 = s2.charAt(j);
-				if ('0' <= c1 && c1 <= '9' && '0' <= c2 && c2 <= '9') { // TODO negative numbers? what about {blah-%number%}? // '-' < '0'
-					final int i2 = StringUtils.findLastDigit(s1, i), j2 = StringUtils.findLastDigit(s2, j);
-					final long n1 = Utils.parseLong("" + s1.substring(i, i2)), n2 = Utils.parseLong("" + s2.substring(j, j2));
-					if (n1 > n2)
-						return 1;
-					if (n1 < n2)
-						return -1;
-					i = i2;
-					j = j2;
-					continue;
-				} else {
-					if (c1 > c2)
-						return 1;
-					if (c1 < c2)
-						return -1;
+
+	static final Comparator<String> VARIABLE_NAME_COMPARATOR = (s1, s2) -> {
+		if (s1 == null)
+			return s2 == null ? 0 : -1;
+
+		if (s2 == null)
+			return 1;
+
+		int i = 0;
+		int j = 0;
+
+		boolean lastNumberNegative = false;
+		boolean afterDecimalPoint = false;
+		while (i < s1.length() && j < s2.length()) {
+			char c1 = s1.charAt(i);
+			char c2 = s2.charAt(j);
+
+			if ('0' <= c1 && c1 <= '9' && '0' <= c2 && c2 <= '9') {
+				// Numbers/digits are treated differently from other characters.
+
+				// The index after the last digit
+				int i2 = StringUtils.findLastDigit(s1, i);
+				int j2 = StringUtils.findLastDigit(s2, j);
+
+				// Amount of leading zeroes
+				int z1 = 0;
+				int z2 = 0;
+
+				// Skip leading zeroes (except for the last if all 0's)
+				if (!afterDecimalPoint) {
+					if (c1 == '0') {
+						while (i < i2 - 1 && s1.charAt(i) == '0') {
+							i++;
+							z1++;
+						}
+					}
+					if (c2 == '0') {
+						while (j < j2 - 1 && s2.charAt(j) == '0') {
+							j++;
+							z2++;
+						}
+					}
+				}
+				// Keep in mind that c1 and c2 may not have the right value (e.g. s1.charAt(i)) for the rest of this block
+
+				// If the number is prefixed by a '-', it should be treated as negative, thus inverting the order.
+				// If the previous number was negative, and the only thing separating them was a '.',
+				//  then this number should also be in inverted order.
+				boolean previousNegative = lastNumberNegative;
+
+				// i - z1 contains the first digit, so i - z1 - 1 may contain a `-` indicating this number is negative
+				lastNumberNegative = i - z1 > 0 && s1.charAt(i - z1 - 1) == '-';
+				int isPositive = (lastNumberNegative | previousNegative) ? -1 : 1;
+
+				// Different length numbers (99 > 9)
+				if (!afterDecimalPoint && i2 - i != j2 - j)
+					return ((i2 - i) - (j2 - j)) * isPositive;
+
+				// Iterate over the digits
+				while (i < i2 && j < j2) {
+					char d1 = s1.charAt(i);
+					char d2 = s2.charAt(j);
+
+					// If the digits differ, return a value dependent on the sign
+					if (d1 != d2)
+						return (d1 - d2) * isPositive;
+
 					i++;
 					j++;
 				}
+
+				// Different length numbers (1.99 > 1.9)
+				if (afterDecimalPoint && i2 - i != j2 - j)
+					return ((i2 - i) - (j2 - j)) * isPositive;
+
+				// If the numbers are equal, but either has leading zeroes,
+				//  more leading zeroes is a lesser number (01 < 1)
+				if (z1 != z2)
+					return (z1 - z2) * isPositive;
+
+				afterDecimalPoint = true;
+			} else {
+				// Normal characters
+				if (c1 != c2)
+					return c1 - c2;
+
+				// Reset the last number flags if we're exiting a number.
+				if (c1 != '.') {
+					lastNumberNegative = false;
+					afterDecimalPoint = false;
+				}
+
+				i++;
+				j++;
 			}
-			if (i < s1.length())
-				return -1;
-			if (j < s2.length())
-				return 1;
-			return 0;
 		}
+		if (i < s1.length())
+			return lastNumberNegative ? -1 : 1;
+		if (j < s2.length())
+			return lastNumberNegative ? 1 : -1;
+		return 0;
 	};
 	
 	final HashMap<String, Object> hashMap = new HashMap<String, Object>();
@@ -135,7 +200,7 @@ final class VariablesMap {
 						parent.put(n, value);
 					break;
 				} else if (value != null) {
-					parent.put(n, current = new TreeMap<String, Object>(variableNameComparator));
+					parent.put(n, current = new TreeMap<String, Object>(VARIABLE_NAME_COMPARATOR));
 					parent = (TreeMap<String, Object>) current;
 					continue;
 				} else {
@@ -169,7 +234,7 @@ final class VariablesMap {
 						parent.put(n, value);
 					break;
 				} else if (value != null) {
-					final TreeMap<String, Object> c = new TreeMap<String, Object>(variableNameComparator);
+					final TreeMap<String, Object> c = new TreeMap<String, Object>(VARIABLE_NAME_COMPARATOR);
 					c.put(null, current);
 					parent.put(n, c);
 					parent = c;
@@ -193,5 +258,35 @@ final class VariablesMap {
 			}
 		}
 	}
-	
+
+	public VariablesMap copy() {
+		VariablesMap copy = new VariablesMap();
+
+		copy.hashMap.putAll(hashMap);
+
+		TreeMap<String, Object> treeMapCopy = copyTreeMap(treeMap);
+		copy.treeMap.putAll(treeMapCopy);
+
+		return copy;
+	}
+
+	@SuppressWarnings("unchecked")
+	private static TreeMap<String, Object> copyTreeMap(TreeMap<String, Object> original) {
+		TreeMap<String, Object> copy = new TreeMap<>(VARIABLE_NAME_COMPARATOR);
+
+		for (Entry<String, Object> child : original.entrySet()) {
+			String key = child.getKey();
+			Object value = child.getValue();
+
+			// Copy by recursion if the child is a TreeMap
+			if (value instanceof TreeMap) {
+				value = copyTreeMap((TreeMap<String, Object>) value);
+			}
+
+			copy.put(key, value);
+		}
+
+		return copy;
+	}
+
 }

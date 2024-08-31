@@ -26,6 +26,7 @@ import ch.njol.skript.lang.Trigger;
 import ch.njol.skript.lang.TriggerItem;
 import ch.njol.skript.timings.SkriptTimings;
 
+import ch.njol.skript.variables.Variables;
 import org.bukkit.Bukkit;
 import org.bukkit.event.Event;
 import org.eclipse.jdt.annotation.Nullable;
@@ -40,18 +41,27 @@ import java.util.concurrent.Executors;
  * Majority of Skript and Minecraft APIs are not thread-safe, so be careful.
  */
 public abstract class AsyncEffect extends Effect {
-	
+
 	@Override
 	@Nullable
 	protected TriggerItem walk(Event e) {
 		debug(e, true);
 		TriggerItem next = getNext();
 		Delay.addDelayedEvent(e);
+		Object localVars = Variables.removeLocals(e); // Back up local variables
+
+		if (!Skript.getInstance().isEnabled()) // See https://github.com/SkriptLang/Skript/issues/3702
+			return null;
+
+
 		Bukkit.getScheduler().runTaskAsynchronously(Skript.getInstance(), new Runnable() {
 	        	@SuppressWarnings("synthetic-access")
 			@Override
 	            	public void run() {
-				execute(e); // Execute this effect
+					// Re-set local variables
+					if (localVars != null)
+						Variables.setLocalVariables(e, localVars);
+					execute(e); // Execute this effect
 	                	if (next != null) {
 					Bukkit.getScheduler().runTask(Skript.getInstance(), new Runnable() {
 						@Override
@@ -68,7 +78,7 @@ public abstract class AsyncEffect extends Effect {
 
 							SkriptTimings.stop(timing); // Stop timing if it was even started
 						}
-					});	
+					});
 				}
 	            	}
 	        });

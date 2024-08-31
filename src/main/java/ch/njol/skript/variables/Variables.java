@@ -81,7 +81,7 @@ public abstract class Variables {
 			@SuppressWarnings("unchecked")
 			private final void init() {
 				// used by asserts
-				info = (ClassInfo<? extends ConfigurationSerializable>) Classes.getExactClassInfo(Object.class);
+				info = (ClassInfo<? extends ConfigurationSerializable>) (ClassInfo <?>) Classes.getExactClassInfo(Object.class);
 			}
 			
 			@SuppressWarnings({"unchecked"})
@@ -261,6 +261,28 @@ public abstract class Variables {
 	static Lock getReadLock() {
 		return variablesLock.readLock();
 	}
+
+	@Nullable
+	public static VariablesMap removeLocals(Event event) {
+		return localVariables.remove(event);
+	}
+
+	public static void setLocalVariables(Event event, @Nullable Object map) {
+		if (map != null) {
+			localVariables.put(event, (VariablesMap) map);
+		} else {
+			removeLocals(event);
+		}
+	}
+
+	@Nullable
+	public static Object copyLocalVariables(Event event) {
+		VariablesMap from = localVariables.get(event);
+		if (from == null)
+			return null;
+
+		return from.copy();
+	}
 	
 	/**
 	 * Returns the internal value of the requested variable.
@@ -431,7 +453,7 @@ public abstract class Variables {
 		return new SerializedVariable(name, var);
 	}
 	
-	@Nullable
+
 	public final static SerializedVariable.Value serialize(final @Nullable Object value) {
 		assert Bukkit.isPrimaryThread();
 		return Classes.serialize(value);

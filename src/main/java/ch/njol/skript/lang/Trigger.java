@@ -22,6 +22,7 @@ package ch.njol.skript.lang;
 import java.io.File;
 import java.util.List;
 
+import ch.njol.skript.variables.Variables;
 import org.bukkit.event.Event;
 import org.eclipse.jdt.annotation.Nullable;
 
@@ -52,7 +53,9 @@ public class Trigger extends TriggerSection {
 	 * @return false if an exception occurred
 	 */
 	public boolean execute(final Event e) {
-		return TriggerItem.walk(this, e);
+		boolean success = TriggerItem.walk(this, e);
+		Variables.removeLocals(e);
+		return success;
 	}
 	
 	@Override
