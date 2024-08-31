@@ -7,52 +7,47 @@ plugins {
 apply plugin: 'java'
 apply plugin: 'maven-publish'
 
-repositories {
-	jcenter()
-	mavenCentral()
+allprojects {
+	repositories {
+		mavenCentral()
 
-	maven {
-		url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/'
-	}
+		maven {
+			url 'https://maven.enginehub.org/repo/'
+		}
 
-//	maven {
-//		url 'https://oss.sonatype.org/content/groups/public/'
-//	}
+		maven {
+			url 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/'
+		}
 
-	maven {
-		url 'http://maven.sk89q.com/repo'
-	}
+		maven {
+			url 'https://repo.skriptlang.org/releases'
+		}
 
-	maven {
-		url 'https://mvn.yawk.at'
-	}
+		maven {
+			url 'https://repo.destroystokyo.com/repository/maven-public/'
+		}
 
-//	maven {
-//		url 'http://nexus.theyeticave.net/content/repositories/pub_releases'
-//	}
+		maven {
+			url 'http://ci.emc.gs/nexus/content/groups/aikar/'
+		}
 
-	maven {
-		url 'https://repo.destroystokyo.com/repository/maven-public/'
-	}
-	
-	maven {
-		url 'http://ci.emc.gs/nexus/content/groups/aikar/'
-	}
-	
-	maven {
-		url 'http://nexus.hc.to/content/repositories/pub_releases'
-	}
-	
-//	maven {
-//		url 'http://maven.elmakers.com/repository/'
-//	}
-	
-	
-	maven {
-		url 'https://jitpack.io'
+		maven {
+			url 'http://nexus.hc.to/content/repositories/pub_releases'
+		}
+
+		maven {
+			url 'https://jitpack.io'
+		}
+
+		maven {
+			url 'https://oss.sonatype.org/content/repositories/snapshots/'
+		}
+
+		maven {
+			url 'https://repo.codemc.org/repository/maven-public'
+		}
 	}
 }
-
 dependencies {
 	compile 'com.destroystokyo.paper:paper-api:1.12.1-R0.1-SNAPSHOT'
 	compile 'org.eclipse.jdt:org.eclipse.jdt.annotation:1.1.0'
@@ -69,7 +64,7 @@ dependencies {
 
 configurations.all {
 	resolutionStrategy.dependencySubstitution {
-		substitute module('org.bukkit:bukkit') with module('com.destroystokyo.paper:paper-api:1.11.2-R0.1-SNAPSHOT')
+		substitute module('org.bukkit:bukkit') with module('com.destroystokyo.paper:paper-api:1.12.1-R0.1-SNAPSHOT')
 	}
 }
 
@@ -102,6 +97,7 @@ dependencies {
 }
 
 compileJava {
+	sourceCompatibility = 1.8
 	options.fork = true
 	options.encoding = 'UTF-8'
 	options.compilerArgs = ['-properties', '.settings/org.eclipse.jdt.core.prefs', '-encoding', 'UTF-8']
@@ -111,8 +107,12 @@ compileJava {
 	}
 }
 
+// Set compile encoding to UTF-8 (#850)
+compileJava.options.encoding = 'UTF-8'
+compileTestJava.options.encoding = 'UTF-8'
+
 task sourceJar(type: Jar) {
-    from sourceSets.main.allJava
+    from sourceSets.main.allSource
 }
 
 publishing {
