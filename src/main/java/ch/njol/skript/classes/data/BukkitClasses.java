@@ -37,6 +37,7 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockState;
 import org.bukkit.command.CommandSender;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Entity;
@@ -48,6 +49,7 @@ import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
@@ -93,11 +95,13 @@ public class BukkitClasses {
 	public BukkitClasses() {}
 	
 	static {
+		final boolean GET_ENTITY_METHOD_EXISTS = Skript.methodExists(Bukkit.class, "getEntity", UUID.class);
 		Classes.registerClass(new ClassInfo<>(Entity.class, "entity")
 				.user("entit(y|ies)")
 				.name("Entity")
 				.description("An entity is something in a <a href='#world'>world</a> that's not a <a href='#block'>block</a>, " +
-						"e.g. a <a href='#player'>player</a>, a skeleton, or a zombie, but also <a href='#projectile'>projectiles</a> like arrows, fireballs or thrown potions, " +
+						"e.g. a <a href='#player'>player</a>, a skeleton, or a zombie, but also " +
+						"<a href='#projectile'>projectiles</a> like arrows, fireballs or thrown potions, " +
 						"or special entities like dropped items, falling blocks or paintings.")
 				.usage("player, op, wolf, tamed ocelot, powered creeper, zombie, unsaddled pig, fireball, arrow, dropped item, item frame, etc.")
 				.examples("entity is a zombie or creeper",
@@ -110,12 +114,29 @@ public class BukkitClasses {
 					@Override
 					@Nullable
 					public Entity parse(final String s, final ParseContext context) {
+						UUID uuid;
+						try {
+							uuid = UUID.fromString(s);
+						} catch (IllegalArgumentException iae) {
+							return null;
+						}
+						if (GET_ENTITY_METHOD_EXISTS) {
+							return Bukkit.getEntity(uuid);
+						} else {
+							for (World world : Bukkit.getWorlds()) {
+								for (Entity entity : world.getEntities()) {
+									if (entity.getUniqueId().equals(uuid)) {
+										return entity;
+									}
+								}
+							}
+						}
 						return null;
 					}
 					
 					@Override
 					public boolean canParse(final ParseContext context) {
-						return false;
+						return context == ParseContext.COMMAND;
 					}
 					
 					@Override
@@ -138,7 +159,8 @@ public class BukkitClasses {
 		Classes.registerClass(new ClassInfo<>(LivingEntity.class, "livingentity")
 				.user("living ?entit(y|ies)")
 				.name("Living Entity")
-				.description("A living <a href='#entity'>entity</a>, i.e. a mob or <a href='#player'>player</a>, not inanimate entities like <a href='#projectile'>projectiles</a> or dropped items.")
+				.description("A living <a href='#entity'>entity</a>, i.e. a mob or <a href='#player'>player</a>, " +
+						"not inanimate entities like <a href='#projectile'>projectiles</a> or dropped items.")
 				.usage("see <a href='#entity'>entity</a>, but ignore inanimate objects")
 				.examples("spawn 5 powered creepers",
 						"shoot a zombie from the creeper")
@@ -161,7 +183,7 @@ public class BukkitClasses {
 				.user("blocks?")
 				.name("Block")
 				.description("A block in a <a href='#world'>world</a>. It has a <a href='#location'>location</a> and a <a href='#itemstack'>type</a>, " +
-						"and can also have a <a href='#direction'>direction</a> (mostly a <a href='../expressions/#ExprFacing'>facing</a>), an <a href='#inventory'>inventory</a>, or other special properties.")
+						"and can also have a <a href='#direction'>direction</a> (mostly a <a href='expressions.html#ExprFacing'>facing</a>), an <a href='#inventory'>inventory</a>, or other special properties.")
 				.usage("")
 				.examples("")
 				.since("1.0")
@@ -177,7 +199,7 @@ public class BukkitClasses {
 					public boolean canParse(final ParseContext context) {
 						return false;
 					}
-					
+
 					@SuppressWarnings("deprecation")
 					@Override
 					public String toString(final Block b, final int flags) {
@@ -238,7 +260,7 @@ public class BukkitClasses {
 						return false;
 					}
 					
-//					return b.getWorld().getName() + ":" + b.getX() + "," + b.getY() + "," + b.getZ();
+					// return b.getWorld().getName() + ":" + b.getX() + "," + b.getY() + "," + b.getZ();
 					@Override
 					@Nullable
 					public Block deserialize(final String s) {
@@ -302,7 +324,7 @@ public class BukkitClasses {
 					}
 				}).serializer(new Serializer<Location>() {
 					@Override
-					public Fields serialize(final Location l) throws NotSerializableException {
+					public Fields serialize(final Location l) {
 						final Fields f = new Fields();
 						f.putObject("world", l.getWorld());
 						f.putPrimitive("x", l.getX());
@@ -314,12 +336,12 @@ public class BukkitClasses {
 					}
 					
 					@Override
-					public void deserialize(final Location o, final Fields f) throws StreamCorruptedException {
+					public void deserialize(final Location o, final Fields f) {
 						assert false;
 					}
 					
 					@Override
-					public Location deserialize(final Fields f) throws StreamCorruptedException, NotSerializableException {
+					public Location deserialize(final Fields f) throws StreamCorruptedException {
 						return new Location(f.getObject("world", World.class),
 								f.getPrimitive("x", double.class), f.getPrimitive("y", double.class), f.getPrimitive("z", double.class),
 								f.getPrimitive("yaw", float.class), f.getPrimitive("pitch", float.class));
@@ -335,7 +357,7 @@ public class BukkitClasses {
 						return true;
 					}
 					
-//					return l.getWorld().getName() + ":" + l.getX() + "," + l.getY() + "," + l.getZ() + "|" + l.getYaw() + "/" + l.getPitch();
+					// return l.getWorld().getName() + ":" + l.getX() + "," + l.getY() + "," + l.getZ() + "|" + l.getYaw() + "/" + l.getPitch();
 					@Override
 					@Nullable
 					public Location deserialize(final String s) {
@@ -355,6 +377,7 @@ public class BukkitClasses {
 						}
 					}
 				}));
+
 		Classes.registerClass(new ClassInfo<>(Vector.class, "vector")
 				.user("vectors?")
 				.name("Vector")
@@ -396,9 +419,8 @@ public class BukkitClasses {
 					}
 				})
 				.serializer(new Serializer<Vector>() {
-
 					@Override
-					public Fields serialize(Vector o) throws NotSerializableException {
+					public Fields serialize(Vector o) {
 						Fields f = new Fields();
 						f.putPrimitive("x", o.getX());
 						f.putPrimitive("y", o.getY());
@@ -407,12 +429,12 @@ public class BukkitClasses {
 					}
 
 					@Override
-					public void deserialize(Vector o, Fields f) throws StreamCorruptedException, NotSerializableException {
+					public void deserialize(Vector o, Fields f) {
 						assert false;
 					}
 					
 					@Override
-					public Vector deserialize(final Fields f) throws StreamCorruptedException, NotSerializableException {
+					public Vector deserialize(final Fields f) throws StreamCorruptedException {
 						return new Vector(f.getPrimitive("x", double.class), f.getPrimitive("y", double.class), f.getPrimitive("z", double.class));
 					}
 
@@ -425,11 +447,8 @@ public class BukkitClasses {
 					protected boolean canBeInstantiated() {
 						return false;
 					}
-					
-				})
-				);
-		
-		// FIXME update doc
+				}));
+
 		Classes.registerClass(new ClassInfo<>(World.class, "world")
 				.user("worlds?")
 				.name("World")
@@ -491,13 +510,14 @@ public class BukkitClasses {
 					@Override
 					protected World deserialize(final Fields fields) throws StreamCorruptedException {
 						final String name = fields.getObject("name", String.class);
+						assert name != null;
 						final World w = Bukkit.getWorld(name);
 						if (w == null)
 							throw new StreamCorruptedException("Missing world " + name);
 						return w;
 					}
 					
-//					return w.getName();
+					// return w.getName();
 					@Override
 					@Nullable
 					public World deserialize(final String s) {
@@ -513,9 +533,11 @@ public class BukkitClasses {
 		Classes.registerClass(new ClassInfo<>(Inventory.class, "inventory")
 				.user("inventor(y|ies)")
 				.name("Inventory")
-				.description("An inventory of a <a href='#player'>player</a> or <a href='#block'>block</a>. Inventories have many effects and conditions regarding the items contained.",
+				.description("An inventory of a <a href='#player'>player</a> or <a href='#block'>block</a>. " +
+								"Inventories have many effects and conditions regarding the items contained.",
 						"An inventory has a fixed amount of <a href='#slot'>slots</a> which represent a specific place in the inventory, " +
-								"e.g. the <a href='../expressions/#ExprArmorSlot'>helmet slot</a> for players (Please note that slot support is still very limited but will be improved eventually).")
+								"e.g. the <a href='expressions.html#ExprArmorSlot'>helmet slot</a> for players " +
+								"(Please note that slot support is still very limited but will be improved eventually).")
 				.usage("")
 				.examples("")
 				.since("1.0")
@@ -562,7 +584,6 @@ public class BukkitClasses {
 				.since("2.2-dev16")
 				.defaultExpression(new EventValueExpression<>(InventoryAction.class))
 				.parser(new Parser<InventoryAction>() {
-
 					@Override
 					@Nullable
 					public InventoryAction parse(String s, ParseContext context) {
@@ -584,7 +605,6 @@ public class BukkitClasses {
 					public String getVariableNamePattern() {
 						return "\\S+";
 					}
-					
 				}));
 		
 		final EnumUtils<ClickType> invClicks = new EnumUtils<>(ClickType.class, "click actions"); // Less boilerplate code!
@@ -659,7 +679,7 @@ public class BukkitClasses {
 				.user("players?")
 				.name("Player")
 				.description("A player. Depending on whether a player is online or offline several actions can be performed with them, " +
-						"though you won't get any errors when using effects that only work if the player is online (e.g. changing his inventory) on an offline player.",
+								"though you won't get any errors when using effects that only work if the player is online (e.g. changing their inventory) on an offline player.",
 						"You have two possibilities to use players as command arguments: &lt;player&gt; and &lt;offline player&gt;. " +
 								"The first requires that the player is online and also accepts only part of the name, " +
 								"while the latter doesn't require that the player is online, but the player's name has to be entered exactly.")
@@ -684,8 +704,8 @@ public class BukkitClasses {
 								Skript.error(String.format(Language.get("commands.multiple players start with"), s));
 							return null;
 						}
-//						if (s.matches("\"\\S+\""))
-//							return Bukkit.getPlayerExact(s.substring(1, s.length() - 1));
+						// if (s.matches("\"\\S+\""))
+						// 	return Bukkit.getPlayerExact(s.substring(1, s.length() - 1));
 						assert false;
 						return null;
 					}
@@ -726,9 +746,10 @@ public class BukkitClasses {
 		
 		Classes.registerClass(new ClassInfo<>(OfflinePlayer.class, "offlineplayer")
 				.user("offline ?players?")
-				.name("Offlineplayer")
+				.name("Offline Player")
 				.description("A player that is possibly offline. See <a href='#player'>player</a> for more information. " +
-						"Please note that while all effects and conditions that require a player can be used with an offline player as well, they will not work if the player is not actually online.")
+						"Please note that while all effects and conditions that require a player can be used with an " +
+						"offline player as well, they will not work if the player is not actually online.")
 				.usage("")
 				.examples("")
 				.since("")
@@ -747,10 +768,10 @@ public class BukkitClasses {
 							return Bukkit.getOfflinePlayer(s);
 							// TODO return an unresolved player and resolve it on a different thread after the command was parsed, and block the command until it is ready
 							// FIXME add note to changelog if not fixed in the next update
-//							return new UnresolvedOfflinePlayer(s);
+							// return new UnresolvedOfflinePlayer(s);
 						}
-//						if (s.matches("\"\\S+\""))
-//							return Bukkit.getOfflinePlayer(s.substring(1, s.length() - 1));
+						// if (s.matches("\"\\S+\""))
+						// 	return Bukkit.getOfflinePlayer(s.substring(1, s.length() - 1));
 						assert false;
 						return null;
 					}
@@ -827,7 +848,7 @@ public class BukkitClasses {
 						}
 					}
 					
-//					return p.getName();
+					// return p.getName();
 					@SuppressWarnings("deprecation")
 					@Override
 					@Nullable
@@ -842,10 +863,10 @@ public class BukkitClasses {
 				}));
 		
 		Classes.registerClass(new ClassInfo<>(CommandSender.class, "commandsender")
-				.user("(commands?)? ?(sender|executor)s?")
+				.user("((commands?)? ?)?(sender|executor)s?")
 				.name("Command Sender")
 				.description("A player or the console.")
-				.usage("use <a href='../expressions/#LitConsole'>the console</a> for the console",
+				.usage("use <a href='expressions.html#LitConsole'>the console</a> for the console",
 						"see <a href='#player'>player</a> for players.")
 				.examples("on command /pm:",
 						"	command sender is not the console",
@@ -884,19 +905,43 @@ public class BukkitClasses {
 		
 		Classes.registerClass(new ClassInfo<>(InventoryHolder.class, "inventoryholder")
 				.name(ClassInfo.NO_DOC)
-				.defaultExpression(new EventValueExpression<>(InventoryHolder.class)));
+				.defaultExpression(new EventValueExpression<>(InventoryHolder.class))
+				.after("entity", "block")
+				.parser(new Parser<InventoryHolder>() {
+
+					@Override
+					public boolean canParse(ParseContext context) {
+						return false;
+					}
+
+					@Override
+					public String toString(InventoryHolder holder, int flags) {
+						return Classes.toString(holder instanceof BlockState ? ((BlockState) holder).getBlock() : holder);
+					}
+
+					@Override
+					public String toVariableNameString(InventoryHolder holder) {
+						return toString(holder, 0);
+					}
+
+					@Override
+					public String getVariableNamePattern() {
+						return ".+";
+					}
+				}));
 		
 		Classes.registerClass(new ClassInfo<>(GameMode.class, "gamemode")
 				.user("game ?modes?")
 				.name("Game Mode")
-				.description("The game modes survival, creative and adventure.")
-				.usage("creative/survival/adventure")
+				.description("The game modes survival, creative, adventure and spectator.")
+				.usage("creative/survival/adventure/spectator")
 				.examples("player's gamemode is survival",
 						"set the player argument's game mode to creative")
 				.since("1.0")
 				.defaultExpression(new SimpleLiteral<>(GameMode.SURVIVAL, true))
 				.parser(new Parser<GameMode>() {
 					private final Message[] names = new Message[GameMode.values().length];
+
 					{
 						int i = 0;
 						for (final GameMode m : GameMode.values()) {
@@ -934,8 +979,8 @@ public class BukkitClasses {
 				.user("item", "material")
 				.name("Item / Material")
 				.description("An item, e.g. a stack of torches, a furnace, or a wooden sword of sharpness 2. " +
-						"Unlike <a href='#itemtype'>item type</a> an item can only represent exactly one item (e.g. an upside-down cobblestone stair facing west), " +
-						"while an item type can represent a whole range of items (e.g. any cobble stone stairs regardless of direction).",
+								"Unlike <a href='#itemtype'>item type</a> an item can only represent exactly one item (e.g. an upside-down cobblestone stair facing west), " +
+								"while an item type can represent a whole range of items (e.g. any cobble stone stairs regardless of direction).",
 						"You don't usually need this type except when you want to make a command that only accepts an exact item.",
 						"Please note that currently 'material' is exactly the same as 'item', i.e. can have an amount & enchantments.")
 				.usage("<code>[&lt;number&gt; [of]] &lt;alias&gt; [of &lt;enchantment&gt; &lt;level&gt;]</code>, Where &lt;alias&gt; must be an alias that represents exactly one item " +
@@ -956,15 +1001,9 @@ public class BukkitClasses {
 							Skript.error("'" + s + "' represents multiple materials");
 							return null;
 						}
-						if (!t.getTypes().get(0).hasDataRange())
-							return t.getRandom();
-						if (t.getTypes().get(0).dataMin > 0) {
-							Skript.error("'" + s + "' represents multiple materials");
-							return null;
-						}
+
 						final ItemStack i = t.getRandom();
 						assert i != null;
-						i.setDurability((short) 0);
 						return i;
 					}
 					
@@ -1030,7 +1069,7 @@ public class BukkitClasses {
 				})
 				.serializer(new EnumSerializer<>(Biome.class)));
 		
-//		PotionEffect is not used; ItemType is used instead
+		// PotionEffect is not used; ItemType is used instead
 		Classes.registerClass(new ClassInfo<>(PotionEffectType.class, "potioneffecttype")
 				.user("potion( ?effect)?( ?type)?s?")
 				.name("Potion Effect Type")
@@ -1076,20 +1115,21 @@ public class BukkitClasses {
 					}
 					
 					@Override
-					public void deserialize(final PotionEffectType o, final Fields f) throws StreamCorruptedException {
+					public void deserialize(final PotionEffectType o, final Fields f) {
 						assert false;
 					}
 					
 					@Override
 					protected PotionEffectType deserialize(final Fields fields) throws StreamCorruptedException {
 						final String name = fields.getObject("name", String.class);
+						assert name != null;
 						final PotionEffectType t = PotionEffectType.getByName(name);
 						if (t == null)
 							throw new StreamCorruptedException("Invalid PotionEffectType " + name);
 						return t;
 					}
 					
-//					return o.getName();
+					// return o.getName();
 					@Override
 					@Nullable
 					public PotionEffectType deserialize(final String s) {
@@ -1104,10 +1144,11 @@ public class BukkitClasses {
 		
 		// REMIND make my own damage cause class (that e.g. stores the attacker entity, the projectile, or the attacking block)
 		Classes.registerClass(new ClassInfo<>(DamageCause.class, "damagecause")
-				.user("damage causes?")
+				.user("damage ?causes?")
 				.name("Damage Cause")
-				.description("The cause/type of a <a href='../events/#damage'>damage event</a>, e.g. lava, fall, fire, drowning, explosion, poison, etc.",
-						"Please note that support for this type is very rudimentary, e.g. lava, fire and burning, as well as projectile and attack are considered different types.")
+				.description("The cause/type of a <a href='events.html#damage'>damage event</a>, e.g. lava, fall, fire, drowning, explosion, poison, etc.",
+						"Please note that support for this type is very rudimentary, e.g. lava, fire and burning, " +
+								"as well as projectile and attack are considered different types.")
 				.usage(DamageCauseUtils.getAllNames())
 				.examples("")
 				.since("2.0")
@@ -1172,9 +1213,7 @@ public class BukkitClasses {
 					}
 				})
 				.serializer(new Serializer<Chunk>() {
-					@SuppressWarnings("null")
 					@Override
-					@Nullable
 					public Fields serialize(final Chunk c) {
 						final Fields f = new Fields();
 						f.putObject("world", c.getWorld());
@@ -1184,7 +1223,7 @@ public class BukkitClasses {
 					}
 					
 					@Override
-					public void deserialize(final Chunk o, final Fields f) throws StreamCorruptedException {
+					public void deserialize(final Chunk o, final Fields f) {
 						assert false;
 					}
 					
@@ -1203,7 +1242,7 @@ public class BukkitClasses {
 						return c;
 					}
 					
-//					return c.getWorld().getName() + ":" + c.getX() + "," + c.getZ();
+					// return c.getWorld().getName() + ":" + c.getX() + "," + c.getZ();
 					@Override
 					@Nullable
 					public Chunk deserialize(final String s) {
@@ -1231,7 +1270,8 @@ public class BukkitClasses {
 		Classes.registerClass(new ClassInfo<>(Enchantment.class, "enchantment")
 				.user("enchantments?")
 				.name("Enchantment")
-				.description("An enchantment, e.g. 'sharpness' or 'furtune'. Unlike <a href='#enchantmenttype'>enchantment type</a> this type has no level, but you usually don't need to use this type anyway.")
+				.description("An enchantment, e.g. 'sharpness' or 'fortune'. Unlike <a href='#enchantmenttype'>enchantment type</a> " +
+						"this type has no level, but you usually don't need to use this type anyway.")
 				.usage(StringUtils.join(EnchantmentType.getNames(), ", "))
 				.examples("")
 				.since("1.4.6")
@@ -1279,6 +1319,7 @@ public class BukkitClasses {
 					@Override
 					protected Enchantment deserialize(final Fields fields) throws StreamCorruptedException {
 						final String name = fields.getObject("name", String.class);
+						assert name != null;
 						final Enchantment e = Enchantment.getByName(name);
 						if (e == null)
 							throw new StreamCorruptedException("Invalid enchantment " + name);
@@ -1302,5 +1343,38 @@ public class BukkitClasses {
 						return false;
 					}
 				}));
+		EnumUtils<PlayerTeleportEvent.TeleportCause> teleportCauses = new EnumUtils<>(PlayerTeleportEvent.TeleportCause.class, "teleport causes");
+		Classes.registerClass(new ClassInfo<>(PlayerTeleportEvent.TeleportCause.class, "teleportcause")
+				.user("teleport ?(cause|reason|type)s?")
+				.name("Teleport Cause")
+				.description("The teleport cause in a <a href='events.html#teleport'>teleport</a> event.")
+				.examples(teleportCauses.getAllNames())
+				.since("2.2-dev35")
+				.parser(new Parser<PlayerTeleportEvent.TeleportCause>() {
+					@Override
+					@Nullable
+					public PlayerTeleportEvent.TeleportCause parse(String input, ParseContext context) {
+						return teleportCauses.parse(input);
+					}
+
+					@Override
+					public String toString(PlayerTeleportEvent.TeleportCause teleportCause, int flags) {
+						return teleportCauses.toString(teleportCause, flags);
+					}
+
+					@SuppressWarnings("null")
+					@Override
+					public String toVariableNameString(PlayerTeleportEvent.TeleportCause teleportCause) {
+						return teleportCause.name();
+					}
+
+					@Override
+					public String getVariableNamePattern() {
+						return "\\S+";
+					}
+				})
+				.serializer(new EnumSerializer<>(PlayerTeleportEvent.TeleportCause.class)));
+
 	}
+
 }

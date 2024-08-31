@@ -589,9 +589,12 @@ public final class BukkitEventValues {
 			public ItemStack get(final PlayerInteractEntityEvent e) {
 				if (offHandSupport) {
 					EquipmentSlot hand = e.getHand();
-					if (hand == EquipmentSlot.HAND) return e.getPlayer().getInventory().getItemInMainHand();
-					else if (hand == EquipmentSlot.OFF_HAND) return e.getPlayer().getInventory().getItemInOffHand();
-					else return null;
+					if (hand == EquipmentSlot.HAND)
+						return e.getPlayer().getInventory().getItemInMainHand();
+					else if (hand == EquipmentSlot.OFF_HAND)
+						return e.getPlayer().getInventory().getItemInOffHand();
+					else
+						return null;
 				} else {
 					return e.getPlayer().getItemInHand();
 				}
@@ -617,7 +620,7 @@ public final class BukkitEventValues {
 			@Nullable
 			public Direction get(final PlayerInteractEvent e) {
 				if (e.getBlockFace() != null)
-					return new Direction(new double[]{e.getBlockFace().getModX(), e.getBlockFace().getModY(), e.getBlockFace().getModZ()});
+					return new Direction(new double[] {e.getBlockFace().getModX(), e.getBlockFace().getModY(), e.getBlockFace().getModZ()});
 				return Direction.ZERO; // Same as 'BlockFace.SELF' or literal 'at'
 			}
 		}, 0);
@@ -875,7 +878,6 @@ public final class BukkitEventValues {
 		//PlayerToggleFlightEvent
 		EventValues.registerEventValue(PlayerToggleFlightEvent.class, Player.class, new Getter<Player, PlayerToggleFlightEvent>() {
 			@Override
-			@Nullable
 			public Player get(PlayerToggleFlightEvent e) {
 				return e.getPlayer();
 			}
