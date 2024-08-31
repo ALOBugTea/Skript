@@ -52,27 +52,7 @@ import org.bukkit.event.inventory.FurnaceBurnEvent;
 import org.bukkit.event.inventory.FurnaceSmeltEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
-import org.bukkit.event.player.PlayerArmorStandManipulateEvent;
-import org.bukkit.event.player.PlayerBedEnterEvent;
-import org.bukkit.event.player.PlayerBedLeaveEvent;
-import org.bukkit.event.player.PlayerBucketEmptyEvent;
-import org.bukkit.event.player.PlayerBucketFillEvent;
-import org.bukkit.event.player.PlayerChangedWorldEvent;
-import org.bukkit.event.player.PlayerEggThrowEvent;
-import org.bukkit.event.player.PlayerFishEvent;
-import org.bukkit.event.player.PlayerInteractAtEntityEvent;
-import org.bukkit.event.player.PlayerItemBreakEvent;
-import org.bukkit.event.player.PlayerItemHeldEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerKickEvent;
-import org.bukkit.event.player.PlayerLevelChangeEvent;
-import org.bukkit.event.player.PlayerLoginEvent;
-import org.bukkit.event.player.PlayerPortalEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.player.PlayerRespawnEvent;
-import org.bukkit.event.player.PlayerTeleportEvent;
-import org.bukkit.event.player.PlayerToggleSneakEvent;
-import org.bukkit.event.player.PlayerToggleSprintEvent;
+import org.bukkit.event.player.*;
 import org.bukkit.event.server.ServerListPingEvent;
 import org.bukkit.event.vehicle.VehicleCreateEvent;
 import org.bukkit.event.vehicle.VehicleDamageEvent;
@@ -320,53 +300,65 @@ public class SimpleEvents {
 				.since("1.0");
 		Skript.registerEvent("Projectile Hit", SimpleEvent.class, ProjectileHitEvent.class, "projectile hit")
 				.description("Called when a projectile hits an entity or a block.",
-						"Use the <a href='#damage'>damage event</a> with a <a href='../conditions/#CondIsSet'>check</a> for a <a href='../expressions/#ExprEntity'>projectile</a> " +
-								"to be able to use the <a href='../expressions/#ExprAttacked'>entity that got hit</a> in the case when the projectile hit a living entity.",
+						"Use the <a href='#damage'>damage event</a> with a <a href='conditions.html#CondIsSet'>check</a> for a <a href='expressions.html#ExprEntity'>projectile</a> " +
+								"to be able to use the <a href='expressions.html#ExprAttacked'>entity that got hit</a> in the case when the projectile hit a living entity.",
 						"A damage event will even be fired if the damage is 0, e.g. when throwing snowballs at non-nether mobs.")
-				.examples("")
+				.examples("on projectile hit:",
+						"\tevent-projectile is arrow",
+						"\tdelete event-projectile")
 				.since("1.0");
 		Skript.registerEvent("Shoot", SimpleEvent.class, ProjectileLaunchEvent.class, "[projectile] shoot")
-				.description("Called whenever a <a href='../classes/#projectile'>projectile</a> is shot. Use the <a href='../expressions/#ExprShooter'>shooter expression</a> to get who shot the projectile.")
-				.examples("")
+				.description("Called whenever a <a href='classes.html#projectile'>projectile</a> is shot. Use the <a href='expressions.html#ExprShooter'>shooter expression</a> to get who shot the projectile.")
+				.examples("on shoot:",
+						"\tif projectile is an arrow:",
+						"\t\tsend \"you shot an arrow!\" to shooter")
 				.since("1.0");
 		Skript.registerEvent("Sign Change", SimpleEvent.class, SignChangeEvent.class, "sign (chang[e]|edit)[ing]", "[player] (chang[e]|edit)[ing] [a] sign")
 				.description("As signs are placed empty, this event is called when a player is done editing a sign.")
 				.examples("on sign change:",
 						"	line 2 is empty",
-						"	set line 1 to \"<red>%line 1%\"")
+						"	set line 1 to \"&lt;red&gt;%line 1%\"")
 				.since("1.0");
 		Skript.registerEvent("Spawn Change", SimpleEvent.class, SpawnChangeEvent.class, "[world] spawn change")
 				.description("Called when the spawn point of a world changes.")
-				.examples("")
+				.examples("on spawn change:",
+						"\tbroadcast \"someone changed the spawn!\"")
 				.since("1.0");
 		Skript.registerEvent("Vehicle Create", SimpleEvent.class, VehicleCreateEvent.class, "vehicle create", "creat(e|ing|ion of) [a] vehicle")
 				.description("Called when a new vehicle is created, e.g. when a player places a boat or minecart.")
-				.examples("")
+				.examples("on vehicle create:")
 				.since("1.0");
 		Skript.registerEvent("Vehicle Damage", SimpleEvent.class, VehicleDamageEvent.class, "vehicle damage", "damag(e|ing) [a] vehicle")
 				.description("Called when a vehicle gets damage. Too much damage will <a href='#vehicle_destroy'>destroy</a> the vehicle.")
-				.examples("")
+				.examples("on vehicle damage:")
 				.since("1.0");
 		Skript.registerEvent("Vehicle Destroy", SimpleEvent.class, VehicleDestroyEvent.class, "vehicle destroy", "destr(oy[ing]|uction of) [a] vehicle")
-				.description("Called when a vehicle is destroyed. Any <a href='../expressions/#ExprPassenger'>passenger</a> will be ejected and the vehicle might drop some item(s).")
-				.examples("")
+				.description("Called when a vehicle is destroyed. Any <a href='expressions.html#ExprPassenger'>passenger</a> will be ejected and the vehicle might drop some item(s).")
+				.examples("on vehicle destroy:",
+						"\tcancel event")
 				.since("1.0");
 		Skript.registerEvent("Vehicle Enter", SimpleEvent.class, VehicleEnterEvent.class, "vehicle enter", "enter[ing] [a] vehicle")
-				.description("Called when an <a href='../classes/#entity'>entity</a> enters a vehicle, either deliberately (players) or by falling into them (mobs).")
-				.examples("")
+				.description("Called when an <a href='classes.html#entity'>entity</a> enters a vehicle, either deliberately (players) or by falling into them (mobs).")
+				.examples("on vehicle enter:",
+						"\tentity is a player",
+						"\tcancel event")
 				.since("1.0");
 		Skript.registerEvent("Vehicle Exit", SimpleEvent.class, VehicleExitEvent.class, "vehicle exit", "exit[ing] [a] vehicle")
 				.description("Called when an entity exits a vehicle.")
-				.examples("")
+				.examples("on vehicle exit:",
+						"\tif event-entity is a spider:",
+						"\t\tkill event-entity")
 				.since("1.0");
 		if (Skript.classExists("org.spigotmc.event.entity.EntityMountEvent")) {
 			Skript.registerEvent("Entity Mount", SimpleEvent.class, EntityMountEvent.class, "mount[ing]")
 					.description("Called when entity starts riding another.")
-					.examples("")
+					.examples("on mount:",
+							"\tcancel event")
 					.since("2.2-dev13b");
 			Skript.registerEvent("Entity Dismount", SimpleEvent.class, EntityDismountEvent.class, "dismount[ing]")
 					.description("Called when an entity dismounts.")
-					.examples("")
+					.examples("on dismount:",
+							"\tkill event-entity")
 					.since("2.2-dev13b");
 		}
 		Skript.registerEvent("World Init", SimpleEvent.class, WorldInitEvent.class, "world init")
@@ -387,31 +379,35 @@ public class SimpleEvents {
 				.examples("")
 				.since("1.0");
 		if (Skript.classExists("org.bukkit.event.entity.EntityToggleGlideEvent")) {
-			Skript.registerEvent("Gliding State Change", SimpleEvent.class, EntityToggleGlideEvent.class, "(gliding state change|toggling gliding)")
+			Skript.registerEvent("Gliding State Change", SimpleEvent.class, EntityToggleGlideEvent.class, "(gliding state change|toggl(e|ing) gliding)")
 					.description("Called when an entity toggles glider on or off, or when server toggles gliding state of an entity forcibly.")
 					.examples("on toggling gliding:",
 							"	cancel the event # bad idea, but you CAN do it!")
 					.since("2.2-dev21");
-			Skript.registerEvent("AoE Cloud Effect", SimpleEvent.class, AreaEffectCloudApplyEvent.class, "(area effect|AoE cloud) effect")
-					.description("Called when area effect cloud applies it's potion effect. This happens every 5 ticks by default.")
-					.examples("")
+			Skript.registerEvent("AoE Cloud Effect", SimpleEvent.class, AreaEffectCloudApplyEvent.class, "(area|AoE) [cloud] effect")
+					.description("Called when area effect cloud applies its potion effect. This happens every 5 ticks by default.")
+					.examples("on area cloud effect:")
 					.since("2.2-dev21");
 		}
 		Skript.registerEvent("Sheep Regrow Wool", SimpleEvent.class, SheepRegrowWoolEvent.class, "sheep [re]grow[ing] wool")
-				.description("Called when sheep regrows it's sheared wool back.")
-				.examples("")
+				.description("Called when sheep regrows its sheared wool back.")
+				.examples("on sheep grow wool:",
+						"\tcancel event")
 				.since("2.2-dev21");
 		Skript.registerEvent("Inventory Open", SimpleEvent.class, InventoryOpenEvent.class, "inventory open[ed]")
 				.description("Called when an inventory is opened for player.")
-				.examples("")
+				.examples("on inventory open:",
+						"\tclose player's inventory")
 				.since("2.2-dev21");
-		Skript.registerEvent("Inventory Close", SimpleEvent.class, InventoryCloseEvent.class, "inventory close[d]")
+		Skript.registerEvent("Inventory Close", SimpleEvent.class, InventoryCloseEvent.class, "inventory clos(ing|e[d])")
 				.description("Called when player's currently viewed inventory is closed.")
-				.examples("")
+				.examples("on inventory close:",
+						"\tif player's location is {location}:",
+						"\t\tsend \"You exited the shop!\"")
 				.since("2.2-dev21");
-		Skript.registerEvent("Slime Split", SimpleEvent.class, SlimeSplitEvent.class, "slime split")
+		Skript.registerEvent("Slime Split", SimpleEvent.class, SlimeSplitEvent.class, "slime split[ting]")
 				.description("Called when a slime splits. Usually this happens when a big slime dies.")
-				.examples("")
+				.examples("on slime split:")
 				.since("2.2-dev26");
 		if (Skript.classExists("org.bukkit.event.entity.EntityResurrectEvent")) {
 			Skript.registerEvent("Resurrect Attempt", SimpleEvent.class, EntityResurrectEvent.class, "[entity] resurrect attempt")
@@ -429,5 +425,11 @@ public class SimpleEvents {
 						"	world is \"city\"",
 					 	"	send \"Welcome to the City!\"")
 				.since("2.2-dev28");
+		Skript.registerEvent("Flight Toggle", SimpleEvent.class, PlayerToggleFlightEvent.class, "[player] flight toggl(e|ing)", "[player] toggl(e|ing) flight")
+				.description("Called when a players stops/starts flying.")
+				.examples("on flight toggle:",
+						"	if {game::%player%::playing} exists:",
+						"		cancel event")
+				.since("2.2-dev36");
 	}
 }
