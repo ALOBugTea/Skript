@@ -784,7 +784,7 @@ public final class Skript extends JavaPlugin implements Listener {
 		PluginDescriptionFile descriptionFile = plugin.getDescription();
 		if (descriptionFile.getDepend().contains("Skript") || descriptionFile.getSoftDepend().contains("Skript")) {
 			// An addon being disabled, check if server is being stopped
-			if (!isServerRunning()) {
+			if (!isServerRunning() && !partDisabled) {
 				Skript.info("Part Disabling Skript due to " + plugin.getName() + " being disabled!");
 				beforeDisable();
 			}
