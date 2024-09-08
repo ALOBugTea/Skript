@@ -81,13 +81,15 @@ public class Delay extends Effect {
 		final long start = Skript.debug() ? System.nanoTime() : 0;
 		final TriggerItem next = getNext();
 		if (next != null && Skript.getInstance().isEnabled()) { // See https://github.com/SkriptLang/Skript/issues/3702
-			// Back up local variables
-			Object localVars = Variables.removeLocals(e);
 
 			delayed.add(e);
 			final Timespan d = duration.getSingle(e);
 			if (d == null)
 				return null;
+
+			// Back up local variables
+			Object localVars = Variables.removeLocals(e);
+
 			Bukkit.getScheduler().scheduleSyncDelayedTask(Skript.getInstance(), new Runnable() {
 				@Override
 				public void run() {
@@ -107,8 +109,6 @@ public class Delay extends Effect {
 					}
 
 					TriggerItem.walk(next, e);
-					Variables.removeLocals(e); // Clean up local vars, we may be exiting now
-
 
 					SkriptTimings.stop(timing); // Stop timing if it was even started
 				}
@@ -118,9 +118,9 @@ public class Delay extends Effect {
 	}
 
 	@SuppressWarnings("null")
-	protected final static Set<Event> delayed = Collections.newSetFromMap(new WeakHashMap<Event, Boolean>());
+	protected final static Set<Event> delayed = Collections.newSetFromMap(new WeakHashMap<>());
 
-	public final static boolean isDelayed(final Event e) {
+	public static boolean isDelayed(final Event e) {
 		return delayed.contains(e);
 	}
 
