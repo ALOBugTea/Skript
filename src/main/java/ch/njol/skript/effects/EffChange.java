@@ -22,6 +22,8 @@ package ch.njol.skript.effects;
 import java.util.Arrays;
 import java.util.logging.Level;
 
+import ch.njol.skript.lang.*;
+import ch.njol.skript.variables.TypeHints;
 import org.bukkit.event.Event;
 import org.eclipse.jdt.annotation.Nullable;
 
@@ -34,11 +36,7 @@ import ch.njol.skript.doc.Description;
 import ch.njol.skript.doc.Examples;
 import ch.njol.skript.doc.Name;
 import ch.njol.skript.doc.Since;
-import ch.njol.skript.lang.Effect;
-import ch.njol.skript.lang.Expression;
-import ch.njol.skript.lang.SkriptParser;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
-import ch.njol.skript.lang.Variable;
 import ch.njol.skript.log.CountingLogHandler;
 import ch.njol.skript.log.ErrorQuality;
 import ch.njol.skript.log.ParseLogHandler;
@@ -52,18 +50,18 @@ import ch.njol.util.Kleenean;
  * @author Peter Güttinger
  */
 @Name("Change: Set/Add/Remove/Delete/Reset")
-@Description("A very general effect that can change many <a href='../expressions'>expressions</a>. Many expressions can only be set and/or deleted, while some can have things added to or removed from them.")
+@Description("A very general effect that can change many <a href='./expressions'>expressions</a>. Many expressions can only be set and/or deleted, while some can have things added to or removed from them.")
 @Examples({"# set:",
-		"Set the player's display name to \"<red>%name of player%\"",
+		"Set the player's display name to \"&lt;red&gt;%name of player%\"",
 		"set the block above the victim to lava",
 		"# add:",
-		"add 2 to the player's health # preferably use '<a href='#heal'>heal</a>' for this",
+		"add 2 to the player's health # preferably use '<a href='#EffHealth'>heal</a>' for this",
 		"add argument to {blacklist::*}",
 		"give a diamond pickaxe of efficiency 5 to the player",
 		"increase the data value of the clicked block by 1",
 		"# remove:",
 		"remove 2 pickaxes from the victim",
-		"subtract 2.5 from {points.%player%}",
+		"subtract 2.5 from {points::%uuid of player%}",
 		"# remove all:",
 		"remove every iron tool from the player",
 		"remove all minecarts from {entitylist::*}",
@@ -148,13 +146,13 @@ public class EffChange extends Effect {
 				changed = exprs[0];
 		}
 		
-		final CountingLogHandler h = SkriptLogger.startLogHandler(new CountingLogHandler(Level.SEVERE));
-		final Class<?>[] rs;
-		final String what;
+		CountingLogHandler h = SkriptLogger.startLogHandler(new CountingLogHandler(Level.SEVERE));
+		Class<?>[] rs;
+		String what;
 		try {
 			rs = changed.acceptChange(mode);
-			final ClassInfo<?> c = Classes.getSuperClassInfo(changed.getReturnType());
-			final Changer<?> changer = c.getChanger();
+			ClassInfo<?> c = Classes.getSuperClassInfo(changed.getReturnType());
+			Changer<?> changer = c.getChanger();
 			what = changer == null || !Arrays.equals(changer.acceptChange(mode), rs) ? changed.toString(null, false) : c.getName().withIndefiniteArticle();
 		} finally {
 			h.stop();
@@ -216,16 +214,17 @@ public class EffChange extends Effect {
 						return false;
 					}
 					log.clear();
-					log.printLog();
+					log.stop();
 					final Class<?>[] r = new Class[rs.length];
 					for (int i = 0; i < rs.length; i++)
 						r[i] = rs[i].isArray() ? rs[i].getComponentType() : rs[i];
-					if (rs.length == 1 && rs[0] == Object.class)
+					if (r.length == 1 && r[0] == Object.class)
 						Skript.error("Can't understand this expression: " + changer, ErrorQuality.NOT_AN_EXPRESSION);
 					else if (mode == ChangeMode.SET)
 						Skript.error(what + " can't be set to " + changer + " because the latter is " + SkriptParser.notOfType(r), ErrorQuality.SEMANTIC_ERROR);
 					else
 						Skript.error(changer + " can't be " + (mode == ChangeMode.ADD ? "added to" : "removed from") + " " + what + " because the former is " + SkriptParser.notOfType(r), ErrorQuality.SEMANTIC_ERROR);
+					log.printError();
 					return false;
 				}
 				log.printLog();
@@ -252,11 +251,21 @@ public class EffChange extends Effect {
 					Skript.error("only one " + Classes.getSuperClassInfo(x).getName() + " can be " + (mode == ChangeMode.ADD ? "added to" : "removed from") + " " + changed + ", not more", ErrorQuality.SEMANTIC_ERROR);
 				return false;
 			}
-			
-			if (changed instanceof Variable && !((Variable<?>) changed).isLocal() && (mode == ChangeMode.SET || ((Variable<?>) changed).isList() && mode == ChangeMode.ADD)) {
-				final ClassInfo<?> ci = Classes.getSuperClassInfo(ch.getReturnType());
-				if (ci.getC() != Object.class && ci.getSerializer() == null && ci.getSerializeAs() == null && !SkriptConfig.disableObjectCannotBeSavedWarnings.value())
-					Skript.warning(ci.getName().withIndefiniteArticle() + " cannot be saved, i.e. the contents of the variable " + changed + " will be lost when the server stops.");
+
+			if (changed instanceof Variable) {
+				Variable<?> variable = (Variable<?>) changed;
+				VariableString name = variable.getName();
+				if (mode == ChangeMode.SET || (variable.isList() && mode == ChangeMode.ADD)) {
+					if (variable.isLocal()) {
+						if (name.isSimple()) // Emit a type hint if possible
+							TypeHints.add(name.toString(), ch.getReturnType());
+					} else {
+						ClassInfo<?> ci = Classes.getSuperClassInfo(ch.getReturnType());
+						if (ci.getC() != Object.class && ci.getSerializer() == null && ci.getSerializeAs() == null && !SkriptConfig.disableObjectCannotBeSavedWarnings.value()) {
+							Skript.warning(ci.getName().withIndefiniteArticle() + " cannot be saved, i.e. the contents of the variable " + changed + " will be lost when the server stops.");
+						}
+					}
+				}
 			}
 		}
 		return true;
@@ -268,7 +277,8 @@ public class EffChange extends Effect {
 		final Object[] delta = changer == null ? null : changer.getArray(e);
 		if (delta != null && delta.length == 0)
 			return;
-		changed.change(e, delta, mode); // REMIND use a random element out of delta if changed only supports changing a single instance
+		changed.change(e, changer == null ? null : changer.beforeChange(changed, delta), mode); // Trigger beforeChanged hook
+		// REMIND use a random element out of delta if changed only supports changing a single instance
 //		changed.change(e, new Changer2<Object>() {
 //			@Override
 //			public Object change(Object o) {
