@@ -109,7 +109,7 @@ public class Delay extends Effect {
 					}
 
 					TriggerItem.walk(next, e);
-					Variables.removeLocals(e);
+					Variables.removeLocals(e); // Clean up local vars, we may be exiting now
 
 					SkriptTimings.stop(timing); // Stop timing if it was even started
 				}
@@ -119,7 +119,7 @@ public class Delay extends Effect {
 	}
 
 	@SuppressWarnings("null")
-	protected final static Set<Event> delayed = Collections.newSetFromMap(new WeakHashMap<>());
+	protected final static Set<Event> delayed = Collections.newSetFromMap(new WeakHashMap<Event, Boolean>());
 
 	public static boolean isDelayed(final Event e) {
 		return delayed.contains(e);
