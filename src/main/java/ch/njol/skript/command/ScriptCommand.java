@@ -246,7 +246,7 @@ public class ScriptCommand implements CommandExecutor {
 	
 	@Nullable
 	private transient Command overridden = null;
-	private transient Map<String, Command> overriddenAliases = new HashMap<String, Command>();
+	private transient Map<String, Command> overriddenAliases = new HashMap<>();
 	
 	public void register(final SimpleCommandMap commandMap, final Map<String, Command> knownCommands, final @Nullable Set<String> aliases) {
 		synchronized (commandMap) {
