@@ -33,11 +33,13 @@ import java.util.TreeMap;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 
+import ch.njol.skript.ScriptLoader;
 import ch.njol.skript.Skript;
 import ch.njol.skript.SkriptAPIException;
 import ch.njol.skript.SkriptConfig;
@@ -54,6 +56,7 @@ import ch.njol.skript.registrations.Comparators;
 import ch.njol.skript.registrations.Converters;
 import ch.njol.skript.util.StringMode;
 import ch.njol.skript.util.Utils;
+import ch.njol.skript.variables.TypeHints;
 import ch.njol.skript.variables.Variables;
 import ch.njol.util.Checker;
 import ch.njol.util.Kleenean;
@@ -110,7 +113,7 @@ public class Variable<T> implements Expression<T> {
 	 * @param printErrors Whether to print errors when they are encountered
 	 * @return true if the name is valid, false otherwise.
 	 */
-	public final static boolean isValidVariableName(String name, final boolean allowListVariable, final boolean printErrors) {
+	public static boolean isValidVariableName(String name, final boolean allowListVariable, final boolean printErrors) {
 		name = name.startsWith(LOCAL_VARIABLE_TOKEN) ? "" + name.substring(LOCAL_VARIABLE_TOKEN.length()).trim() : "" + name.trim();
 		if (!allowListVariable && name.contains(SEPARATOR)) {
 			if (printErrors)
@@ -148,10 +151,56 @@ public class Variable<T> implements Expression<T> {
 		name = "" + name.trim();
 		if (!isValidVariableName(name, true, true))
 			return null;
-		final VariableString vs = VariableString.newInstance(name.startsWith(LOCAL_VARIABLE_TOKEN) ? "" + name.substring(LOCAL_VARIABLE_TOKEN.length()).trim() : name, StringMode.VARIABLE_NAME);
+		VariableString vs = VariableString.newInstance(name.startsWith(LOCAL_VARIABLE_TOKEN) ? "" + name.substring(LOCAL_VARIABLE_TOKEN.length()).trim() : name, StringMode.VARIABLE_NAME);
 		if (vs == null)
 			return null;
-		return new Variable<>(vs, types, name.startsWith(LOCAL_VARIABLE_TOKEN), name.endsWith(SEPARATOR + "*"), null);
+
+		boolean isLocal = name.startsWith(LOCAL_VARIABLE_TOKEN);
+		boolean isPlural = name.endsWith(SEPARATOR + "*");
+
+		// Check for local variable type hints
+		if (isLocal && vs.isSimple()) { // Only variable names we fully know already
+			Class<?> hint = TypeHints.get(vs.toString());
+			if (hint != null && !hint.equals(Object.class)) { // Type hint available
+				// See if we can get correct type without conversion
+				for (Class<? extends T> type : types) {
+					assert type != null;
+					if (type.isAssignableFrom(hint)) {
+						// Hint matches, use variable with exactly correct type
+						return new Variable<>(vs, CollectionUtils.array(type), isLocal, isPlural, null);
+					}
+				}
+
+				// Or with conversion?
+				for (Class<? extends T> type : types) {
+					assert type != null;
+					if (Converters.converterExists(hint, type)) {
+						// Hint matches, even though converter is needed
+						return new Variable<>(vs, CollectionUtils.array(type), isLocal, isPlural, null);
+					}
+
+					// Special cases
+					if (type.isAssignableFrom(World.class) && hint.isAssignableFrom(String.class)) {
+						// String->World conversion is weird spaghetti code
+						return new Variable<>(vs, types, isLocal, isPlural, null);
+					} else if (type.isAssignableFrom(Player.class) && hint.isAssignableFrom(String.class)) {
+						// String->Player conversion is not available at this point
+						return new Variable<>(vs, types, isLocal, isPlural, null);
+					}
+				}
+
+				// Hint exists and does NOT match any types requested
+				ClassInfo<?>[] infos = new ClassInfo[types.length];
+				for (int i = 0; i < types.length; i++) {
+					infos[i] = Classes.getExactClassInfo(types[i]);
+				}
+				Skript.warning("Local variable '" + name + "' is " + Classes.toString(Classes.getExactClassInfo(hint))
+						+ ", not " + Classes.toString(infos, false));
+				// Fall back to not having any type hints
+			}
+		}
+
+		return new Variable<>(vs, types, isLocal, isPlural, null);
 	}
 	
 	@Override
@@ -193,12 +242,16 @@ public class Variable<T> implements Expression<T> {
 	public <R> Variable<R> getConvertedExpression(final Class<R>... to) {
 		return new Variable<>(name, to, local, list, this);
 	}
-	
+
 	/**
 	 * Gets the value of this variable as stored in the variables map.
+	 *
+	 * This is mostly for internal usage, if you want to get the value(s)
+	 * the variable holds then use {@link Variable#getArray(Event)},
+	 * {@link Variable#getAll(Event)} or {@link Variable#getSingle(Event)}
 	 */
 	@Nullable
-	private Object getRaw(final Event e) {
+	public Object getRaw(final Event e) {
 		final String n = name.toString(e).toLowerCase(Locale.ENGLISH);
 		if (n.endsWith(Variable.SEPARATOR + "*") != list) // prevents e.g. {%expr%} where "%expr%" ends with "::*" from returning a Map
 			return null;
@@ -412,8 +465,9 @@ public class Variable<T> implements Expression<T> {
 					int i = 1;
 					for (final Object d : delta) {
 						if (d instanceof Object[]) {
-							for (int j = 0; j < ((Object[]) d).length; j++)
+							for (int j = 0; j < ((Object[]) d).length; j++) {
 								setIndex(e, "" + i + SEPARATOR + j, ((Object[]) d)[j]);
+							}
 						} else {
 							setIndex(e, "" + i, d);
 						}
@@ -603,7 +657,11 @@ public class Variable<T> implements Expression<T> {
 	public boolean check(final Event e, final Checker<? super T> c) {
 		return SimpleExpression.check(getAll(e), c, false, getAnd());
 	}
-	
+
+	public VariableString getName() {
+		return name;
+	}
+
 	@Override
 	public boolean getAnd() {
 		return true;
