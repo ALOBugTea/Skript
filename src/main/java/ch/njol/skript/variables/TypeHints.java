@@ -26,6 +26,9 @@ import java.util.Map;
 
 import org.eclipse.jdt.annotation.Nullable;
 
+import ch.njol.skript.SkriptAPIException;
+import ch.njol.skript.lang.Variable;
+
 /**
  * This is used to manage local variable type hints.
  *
@@ -33,6 +36,7 @@ import org.eclipse.jdt.annotation.Nullable;
  * <li>EffChange adds then when local variables are set
  * <li>Variable checks them when parser tries to create it
  * <li>ScriptLoader clears hints after each section has been parsed
+ * <li>ScriptLoader enters and exists scopes as needed
  * </ul>
  */
 public class TypeHints {
@@ -50,6 +54,19 @@ public class TypeHints {
 		// Take top of stack, without removing it
 		Map<String, Class<?>> hints = typeHints.getFirst();
 		hints.put(variable, hint);
+	}
+
+	/**
+	 * Return any known type hints of a local variable.
+	 *
+	 * @param variable The local variable expression to check against.
+	 * @return The return type that the local variable has been set to otherwise null if unset.
+	 */
+	@Nullable
+	public static Class<?> get(Variable<?> variable) {
+		if (!variable.isLocal())
+			throw new SkriptAPIException("Must only get TypeHints of local variables.");
+		return get(variable.getName().toString());
 	}
 
 	@Nullable
@@ -76,4 +93,5 @@ public class TypeHints {
 		typeHints.clear();
 		typeHints.push(new HashMap<>());
 	}
+
 }
