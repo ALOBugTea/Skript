@@ -112,9 +112,13 @@ public abstract class VariablesStorage implements Closeable {
 					SerializedVariable variable = changesQueue.take();
 					Value value = variable.value;
 
+					if (!Skript.getInstance().isEnabled())
+						Skript.warning("Variable save thread for '" + variable.name + "' was try to saving, " + "changedsQueue left" + changesQueue.size() + " variables.");
+
 					// Actually save the variable
-					if (value != null)
+					if (value != null){
 						save(variable.name, value.type, value.data);
+					}
 					else
 						save(variable.name, null, null);
 				} catch (InterruptedException ignored) {
