@@ -414,33 +414,53 @@ public class FlatFileStorage extends VariablesStorage {
 			Variables.getReadLock().unlock();
 		}
 	}
-	
+
 	/**
 	 * Saves the variables.
 	 * <p>
 	 * This method uses the sorted variables map to save the variables in order.
-	 * 
-	 * @param pw
-	 * @param parent The parent's name with {@link Variable#SEPARATOR} at the end
-	 * @param map
+	 *
+	 * @param pw the print writer to write the CSV lines too.
+	 * @param parent The parent's name with {@link Variable#SEPARATOR} at the end.
+	 * @param map the variables map.
 	 */
 	@SuppressWarnings("unchecked")
-	private final void save(final PrintWriter pw, final String parent, final TreeMap<String, Object> map) {
-		outer: for (final Entry<String, Object> e : map.entrySet()) {
-			final Object val = e.getValue();
-			if (val == null)
-				continue;
-			if (val instanceof TreeMap) {
-				save(pw, parent + e.getKey() + Variable.SEPARATOR, (TreeMap<String, Object>) val);
+	private void save(PrintWriter pw, String parent, TreeMap<String, Object> map) {
+		// Iterate over all children
+		for (Entry<String, Object> childEntry : map.entrySet()) {
+			Object childNode = childEntry.getValue();
+			String childKey = childEntry.getKey();
+
+			if (childNode == null)
+				continue; // Leaf node
+
+			if (childNode instanceof TreeMap) {
+				// TreeMap found, recurse
+				save(pw, parent + childKey + Variable.SEPARATOR, (TreeMap<String, Object>) childNode);
 			} else {
-				final String name = (e.getKey() == null ? parent.substring(0, parent.length() - Variable.SEPARATOR.length()) : parent + e.getKey());
-				for (final VariablesStorage s : Variables.storages) {
-					if (s != this && s.accept(name))
-						continue outer;
+				// Remove variable separator if needed
+				String name = childKey == null ? parent.substring(0, parent.length() - Variable.SEPARATOR.length()) : parent + childKey;
+
+				try {
+					// Loop over storages to make sure this variable is ours to store
+					for (VariablesStorage storage : Variables.storages) {
+						if (storage.accept(name)) {
+							if (storage == this) {
+								// Serialize the value
+								SerializedVariable.Value serializedValue = Classes.serialize(childNode);
+
+								// Write the CSV line
+								if (serializedValue != null)
+									writeCSV(pw, name, serializedValue.type, encode(serializedValue.data));
+							}
+
+							break;
+						}
+					}
+				} catch (Exception ex) {
+					//noinspection ThrowableNotThrown
+					Skript.exception(ex, "Error saving variable named " + name);
 				}
-				final SerializedVariable.Value value = Classes.serialize(val);
-				if (value != null)
-					writeCSV(pw, name, value.type, encode(value.data));
 			}
 		}
 	}
