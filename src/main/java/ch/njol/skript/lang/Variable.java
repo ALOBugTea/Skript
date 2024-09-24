@@ -463,17 +463,21 @@ public class Variable<T> implements Expression<T> {
 				if (list) {
 					set(e, null);
 					int i = 1;
-					for (final Object d : delta) {
-						if (d instanceof Object[]) {
-							for (int j = 0; j < ((Object[]) d).length; j++) {
-								setIndex(e, "" + i + SEPARATOR + j, ((Object[]) d)[j]);
+					for (Object value : delta) {
+						if (value instanceof Object[]) {
+							for (int j = 0; j < ((Object[]) value).length; j++) {
+								setIndex(e, "" + i + SEPARATOR + (j + 1), ((Object[]) value)[j]);
 							}
 						} else {
-							setIndex(e, "" + i, d);
+							setIndex(e, "" + i, value);
 						}
 						i++;
 					}
-				} else {
+				} else if (delta.length > 0) {
+					// if length = 0, likely a failure in casting
+					// (eg, set vector length of {_notvector} to 1, which casts delta to Vector[], resulting in an empty Vector array)
+					// so just do nothing.
+
 					//Mirre Start, Location bug quickfix.
 					if(delta[0] instanceof Location){
 						set(e, ((Location)delta[0]).clone());
