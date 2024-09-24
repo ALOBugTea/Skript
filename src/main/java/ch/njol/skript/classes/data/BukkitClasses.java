@@ -21,11 +21,8 @@ package ch.njol.skript.classes.data;
 
 import java.io.NotSerializableException;
 import java.io.StreamCorruptedException;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -143,12 +140,12 @@ public class BukkitClasses {
 					public String toVariableNameString(final Entity e) {
 						return "entity:" + e.getUniqueId().toString().toLowerCase(Locale.ENGLISH);
 					}
-					
+
 					@Override
 					public String getVariableNamePattern() {
 						return "entity:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 					}
-					
+
 					@Override
 					public String toString(final Entity e, final int flags) {
 						return EntityData.toString(e, flags);
@@ -268,9 +265,8 @@ public class BukkitClasses {
 						if (split.length != 4)
 							return null;
 						final World w = Bukkit.getWorld(split[0]);
-						if (w == null) {
+						if (w == null)
 							return null;
-						}
 						try {
 							final int[] l = new int[3];
 							for (int i = 0; i < 3; i++)
@@ -324,15 +320,21 @@ public class BukkitClasses {
 					}
 				}).serializer(new Serializer<Location>() {
 					@Override
-					public Fields serialize(final Location l) {
-						final Fields f = new Fields();
-						f.putObject("world", l.getWorld());
-						f.putPrimitive("x", l.getX());
-						f.putPrimitive("y", l.getY());
-						f.putPrimitive("z", l.getZ());
-						f.putPrimitive("yaw", l.getYaw());
-						f.putPrimitive("pitch", l.getPitch());
-						return f;
+					public Fields serialize(Location location) {
+						Fields fields = new Fields();
+						World world = null;
+						try {
+							world = location.getWorld();
+						} catch (IllegalArgumentException exception) {
+							Skript.warning("A location failed to serialize with its defined world, as the world was unloaded.");
+						}
+						fields.putObject("world", world);
+						fields.putPrimitive("x", location.getX());
+						fields.putPrimitive("y", location.getY());
+						fields.putPrimitive("z", location.getZ());
+						fields.putPrimitive("yaw", location.getYaw());
+						fields.putPrimitive("pitch", location.getPitch());
+						return fields;
 					}
 					
 					@Override
@@ -678,34 +680,48 @@ public class BukkitClasses {
 		Classes.registerClass(new ClassInfo<>(Player.class, "player")
 				.user("players?")
 				.name("Player")
-				.description("A player. Depending on whether a player is online or offline several actions can be performed with them, " +
-								"though you won't get any errors when using effects that only work if the player is online (e.g. changing their inventory) on an offline player.",
+				.description(
+						"A player. Depending on whether a player is online or offline several actions can be performed with them, " +
+						"though you won't get any errors when using effects that only work if the player is online (e.g. changing their inventory) on an offline player.",
 						"You have two possibilities to use players as command arguments: &lt;player&gt; and &lt;offline player&gt;. " +
-								"The first requires that the player is online and also accepts only part of the name, " +
-								"while the latter doesn't require that the player is online, but the player's name has to be entered exactly.")
-				.usage("")
-				.examples("")
-				.since("1.0")
+						"The first requires that the player is online and also accepts only part of the name, " +
+						"while the latter doesn't require that the player is online, but the player's name has to be entered exactly."
+				).usage(
+						"Parsing an offline player as a player (online) will return nothing (none), for that case you would need to parse as " +
+						"offlineplayer which only returns nothing (none) if player doesn't exist in Minecraft databases (name not taken) otherwise it will return the player regardless of their online status."
+				).examples(
+						"set {_p} to \"Notch\" parsed as a player # returns <none> unless Notch is actually online or starts with Notch like Notchan",
+						"set {_p} to \"N\" parsed as a player # returns Notch if Notch is online because their name starts with 'N' (case insensitive) however, it would return nothing if no player whose name starts with 'N' is online."
+				).since("1.0")
 				.defaultExpression(new EventValueExpression<>(Player.class))
 				.after("string", "world")
 				.parser(new Parser<Player>() {
 					@Override
 					@Nullable
-					public Player parse(final String s, final ParseContext context) {
+					public Player parse(String string, ParseContext context) {
 						if (context == ParseContext.COMMAND) {
-							if (s.matches("(?i)[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}"))
-								return Bukkit.getPlayer(UUID.fromString(s));
-							final List<Player> ps = Bukkit.matchPlayer(s);
-							if (ps.size() == 1)
-								return ps.get(0);
-							if (ps.size() == 0)
-								Skript.error(String.format(Language.get("commands.no player starts with"), s));
+							if (string.isEmpty())
+								return null;
+							if (string.matches("(?i)[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}"))
+								return Bukkit.getPlayer(UUID.fromString(string));
+							String name = string.toLowerCase(Locale.ENGLISH);
+							int nameLength = name.length(); // caching
+							List<Player> players = new ArrayList<>();
+							for (Player player : Bukkit.getOnlinePlayers()) {
+								if (player.getName().toLowerCase(Locale.ENGLISH).startsWith(name)) {
+									if (player.getName().length() == nameLength) // a little better in performance than String#equals()
+										return player;
+									players.add(player);
+								}
+							}
+							if (players.size() == 1)
+								return players.get(0);
+							if (players.size() == 0)
+								Skript.error(String.format(Language.get("commands.no player starts with"), string));
 							else
-								Skript.error(String.format(Language.get("commands.multiple players start with"), s));
+								Skript.error(String.format(Language.get("commands.multiple players start with"), string));
 							return null;
 						}
-						// if (s.matches("\"\\S+\""))
-						// 	return Bukkit.getPlayerExact(s.substring(1, s.length() - 1));
 						assert false;
 						return null;
 					}
@@ -747,16 +763,18 @@ public class BukkitClasses {
 		Classes.registerClass(new ClassInfo<>(OfflinePlayer.class, "offlineplayer")
 				.user("offline ?players?")
 				.name("Offline Player")
-				.description("A player that is possibly offline. See <a href='#player'>player</a> for more information. " +
+				.description(
+						"A player that is possibly offline. See <a href='#player'>player</a> for more information. " +
 						"Please note that while all effects and conditions that require a player can be used with an " +
-						"offline player as well, they will not work if the player is not actually online.")
-				.usage("")
-				.examples("")
-				.since("")
+						"offline player as well, they will not work if the player is not actually online."
+				).usage(
+						"Parsing an offline player as a player (online) will return nothing (none), for that case you would need to parse as " +
+						"offlineplayer which only returns nothing (none) if player doesn't exist in Minecraft databases (name not taken) otherwise it will return the player regardless of their online status."
+				).examples("set {_p} to \"Notch\" parsed as an offlineplayer # returns Notch even if they're offline")
+				.since("2.0 beta 8")
 				.defaultExpression(new EventValueExpression<>(OfflinePlayer.class))
 				.after("string", "world")
 				.parser(new Parser<OfflinePlayer>() {
-					@SuppressWarnings("deprecation")
 					@Override
 					@Nullable
 					public OfflinePlayer parse(final String s, final ParseContext context) {
@@ -766,12 +784,7 @@ public class BukkitClasses {
 							else if (!s.matches("\\S+") || s.length() > 16)
 								return null;
 							return Bukkit.getOfflinePlayer(s);
-							// TODO return an unresolved player and resolve it on a different thread after the command was parsed, and block the command until it is ready
-							// FIXME add note to changelog if not fixed in the next update
-							// return new UnresolvedOfflinePlayer(s);
 						}
-						// if (s.matches("\"\\S+\""))
-						// 	return Bukkit.getOfflinePlayer(s.substring(1, s.length() - 1));
 						assert false;
 						return null;
 					}
@@ -782,18 +795,18 @@ public class BukkitClasses {
 					}
 					
 					@Override
-					public String toString(final OfflinePlayer p, final int flags) {
-						return "" + p.getName();
+					public String toString(OfflinePlayer p, int flags) {
+						return p.getName() == null ? p.getUniqueId().toString() : p.getName();
 					}
 					
 					@Override
-					public String toVariableNameString(final OfflinePlayer p) {
-						if (SkriptConfig.usePlayerUUIDsInVariableNames.value())
+					public String toVariableNameString(OfflinePlayer p) {
+						if (SkriptConfig.usePlayerUUIDsInVariableNames.value() || p.getName() == null)
 							return "" + p.getUniqueId();
 						else
 							return "" + p.getName();
 					}
-					
+
 					@Override
 					public String getVariableNamePattern() {
 						if (SkriptConfig.usePlayerUUIDsInVariableNames.value())
@@ -803,20 +816,16 @@ public class BukkitClasses {
 					}
 					
 					@Override
-					public String getDebugMessage(final OfflinePlayer p) {
+					public String getDebugMessage(OfflinePlayer p) {
 						if (p.isOnline())
 							return Classes.getDebugMessage(p.getPlayer());
-						return "" + p.getName();
+						return toString(p, 0);
 					}
 				}).serializer(new Serializer<OfflinePlayer>() {
-					private final boolean uuidSupported = Skript.methodExists(OfflinePlayer.class, "getUniqueId");
-					
 					@Override
 					public Fields serialize(final OfflinePlayer p) {
 						final Fields f = new Fields();
-						if (uuidSupported)
-							f.putObject("uuid", p.getUniqueId());
-						f.putObject("name", p.getName());
+						f.putObject("uuid", p.getUniqueId());
 						return f;
 					}
 					
@@ -833,18 +842,16 @@ public class BukkitClasses {
 					@SuppressWarnings("deprecation")
 					@Override
 					protected OfflinePlayer deserialize(final Fields fields) throws StreamCorruptedException {
-						if (fields.contains("uuid") && uuidSupported) {
+						if (fields.contains("uuid")) {
 							final UUID uuid = fields.getObject("uuid", UUID.class);
-							OfflinePlayer p;
-							if (uuid == null || (p = Bukkit.getOfflinePlayer(uuid)) == null)
+							if (uuid == null)
 								throw new StreamCorruptedException();
-							return p;
+							return Bukkit.getOfflinePlayer(uuid);
 						} else {
 							final String name = fields.getObject("name", String.class);
-							OfflinePlayer p;
-							if (name == null || (p = Bukkit.getOfflinePlayer(name)) == null)
+							if (name == null)
 								throw new StreamCorruptedException();
-							return p;
+							return Bukkit.getOfflinePlayer(name);
 						}
 					}
 					
