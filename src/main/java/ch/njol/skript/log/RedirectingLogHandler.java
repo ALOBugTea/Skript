@@ -18,7 +18,6 @@
  */
 package ch.njol.skript.log;
 
-import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.eclipse.jdt.annotation.Nullable;
 

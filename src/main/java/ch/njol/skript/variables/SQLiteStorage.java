@@ -22,6 +22,7 @@ import java.io.File;
 
 import ch.njol.skript.config.SectionNode;
 import ch.njol.skript.log.SkriptLogger;
+import lib.PatPeter.SQLibrary.Database;
 import lib.PatPeter.SQLibrary.SQLite;
 
 public class SQLiteStorage extends SQLStorage {
@@ -36,12 +37,12 @@ public class SQLiteStorage extends SQLStorage {
 	}
 
 	@Override
-	public Object initialize(SectionNode config) {
+	public Database initialize(SectionNode config) {
 		File f = file;
 		if (f == null)
 			return null;
 		setTableName(config.get("table", "variables21"));
-		final String name = f.getName();
+		String name = f.getName();
 		assert name.endsWith(".db");
 		return new SQLite(SkriptLogger.LOGGER, "[Skript]", f.getParent(), name.substring(0, name.length() - ".db".length()));
 	}

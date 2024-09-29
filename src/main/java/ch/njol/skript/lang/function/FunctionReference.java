@@ -25,16 +25,15 @@ import ch.njol.skript.classes.ClassInfo;
 import ch.njol.skript.config.Node;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
-import ch.njol.skript.lang.UnparsedLiteral;
 import ch.njol.skript.log.RetainingLogHandler;
 import ch.njol.skript.log.SkriptLogger;
 import ch.njol.skript.registrations.Classes;
-import ch.njol.skript.registrations.Converters;
+import org.skriptlang.skript.lang.converter.Converters;
 import ch.njol.skript.util.LiteralUtils;
 import ch.njol.util.StringUtils;
-import ch.njol.util.coll.CollectionUtils;
 import org.bukkit.event.Event;
 import org.eclipse.jdt.annotation.Nullable;
+import ch.njol.skript.util.Contract;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -43,7 +42,7 @@ import java.util.List;
 /**
  * Reference to a Skript function.
  */
-public class FunctionReference<T> {
+public class FunctionReference<T> implements Contract {
 	
 	/**
 	 * Name of function that is called, for logging purposes.
@@ -73,7 +72,7 @@ public class FunctionReference<T> {
 	 * Definitions of function parameters.
 	 */
 	private final Expression<?>[] parameters;
-	
+
 	/**
 	 * Indicates if the caller expects this function to return a single value.
 	 * Used for verifying correctness of the function signature.
@@ -99,13 +98,33 @@ public class FunctionReference<T> {
 	 */
 	@Nullable
 	public final String script;
-	
-	public FunctionReference(String functionName, @Nullable Node node, @Nullable String script, @Nullable Class<? extends T>[] returnTypes, Expression<?>[] params) {
+
+	/**
+	 * The contract for this function (typically the function reference itself).
+	 * Used to determine input-based return types and simple behaviour.
+	 */
+	private Contract contract;
+
+	public FunctionReference(
+			String functionName, @Nullable Node node, @Nullable String script,
+			@Nullable Class<? extends T>[] returnTypes, Expression<?>[] params
+	) {
 		this.functionName = functionName;
 		this.node = node;
 		this.script = script;
 		this.returnTypes = returnTypes;
-		parameters = params;
+		this.parameters = params;
+		this.contract = this;
+	}
+
+	public boolean validateParameterArity(boolean first) {
+		if (!first && script == null)
+			return false;
+		Signature<?> sign = Functions.getSignature(functionName, script);
+		if (sign == null)
+			return false;
+		// Not enough parameters
+		return parameters.length >= sign.getMinParameters();
 	}
 	
 	/**
@@ -116,12 +135,14 @@ public class FunctionReference<T> {
 	 */
 	@SuppressWarnings("unchecked")
 	public boolean validateFunction(boolean first) {
+		if (!first && script == null)
+			return false;
 		Function<? extends T> previousFunction = function;
 		function = null;
 		SkriptLogger.setNode(node);
 		Skript.debug("Validating function " + functionName);
-		Signature<?> sign = Functions.getSignature(functionName);
-		
+		Signature<?> sign = Functions.getSignature(functionName, script);
+
 		// Check if the requested function exists
 		if (sign == null) {
 			if (first) {
@@ -244,6 +265,10 @@ public class FunctionReference<T> {
 		
 		signature = (Signature<? extends T>) sign;
 		sign.calls.add(this);
+
+		Contract contract = sign.getContract();
+		if (contract != null)
+			this.contract = contract;
 		
 		return true;
 	}
@@ -264,11 +289,10 @@ public class FunctionReference<T> {
 	protected T[] execute(Event e) {
 		// If needed, acquire the function reference
 		if (function == null)
-			function = (Function<? extends T>) Functions.getFunction(functionName);
-		
+			function = (Function<? extends T>) Functions.getFunction(functionName, script);
+
 		if (function == null) { // It might be impossible to resolve functions in some cases!
-			Skript.error("Couldn't resolve call for '" + functionName +
-				"'. Be careful when using functions in 'script load' events!");
+			Skript.error("Couldn't resolve call for '" + functionName + "'.");
 			return null; // Return nothing and hope it works
 		}
 		
@@ -298,21 +322,41 @@ public class FunctionReference<T> {
 		// Execute the function
 		return function.execute(params);
 	}
-	
+
 	public boolean isSingle() {
+		return contract.isSingle(parameters);
+	}
+
+	@Override
+	public boolean isSingle(Expression<?>... arguments) {
 		return single;
 	}
-	
+
 	@Nullable
 	public Class<? extends T> getReturnType() {
+		//noinspection unchecked
+		return (Class<? extends T>) contract.getReturnType(parameters);
+	}
+
+	@Override
+	@Nullable
+	public Class<?> getReturnType(Expression<?>... arguments) {
 		if (signature == null)
 			throw new SkriptAPIException("Signature of function is null when return type is asked!");
-		
+
 		@SuppressWarnings("ConstantConditions")
 		ClassInfo<? extends T> ret = signature.returnType;
 		return ret == null ? null : ret.getC();
 	}
-	
+
+	/**
+	 * The contract is used in preference to the function for determining return type, etc.
+	 * @return The contract determining this function's parse-time hints, potentially this reference
+	 */
+	public Contract getContract() {
+		return contract;
+	}
+
 	public String toString(@Nullable Event e, boolean debug) {
 		StringBuilder b = new StringBuilder(functionName + "(");
 		for (int i = 0; i < parameters.length; i++) {
