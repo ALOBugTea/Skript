@@ -18,7 +18,6 @@
  */
 package ch.njol.skript.variables;
 
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -26,7 +25,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Optional;
 import java.util.Queue;
 import java.util.TreeMap;
 import java.util.concurrent.BlockingQueue;
@@ -38,15 +36,13 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Pattern;
 
+import ch.njol.skript.log.SkriptLogger;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.serialization.ConfigurationSerializable;
 import org.bukkit.configuration.serialization.ConfigurationSerialization;
 import org.bukkit.event.Event;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
-
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Multimap;
 
 import ch.njol.skript.Skript;
 import ch.njol.skript.SkriptAPIException;
@@ -57,9 +53,9 @@ import ch.njol.skript.config.Config;
 import ch.njol.skript.config.Node;
 import ch.njol.skript.config.SectionNode;
 import ch.njol.skript.lang.Variable;
-import ch.njol.skript.log.SkriptLogger;
 import ch.njol.skript.registrations.Classes;
 import ch.njol.skript.registrations.Converters;
+import ch.njol.skript.variables.DatabaseStorage.Type;
 import ch.njol.skript.variables.SerializedVariable.Value;
 import ch.njol.util.Closeable;
 import ch.njol.util.Kleenean;
@@ -67,19 +63,20 @@ import ch.njol.util.NonNullPair;
 import ch.njol.util.SynchronizedReference;
 import ch.njol.yggdrasil.Yggdrasil;
 
+/**
+ * @author Peter Güttinger
+ */
 public abstract class Variables {
-
-	// Field order matters!
+	private Variables() {}
 
 	public final static short YGGDRASIL_VERSION = 1;
+
 	public final static Yggdrasil yggdrasil = new Yggdrasil(YGGDRASIL_VERSION);
 
-	private final static Multimap<String, Class<? extends VariablesStorage>> types = HashMultimap.create();
+	public static boolean caseInsensitiveVariables = true;
 
+	private final static String configurationSerializablePrefix = "ConfigurationSerializable_";
 	static {
-		registerStorage(FlatFileStorage.class, "csv", "file", "flatfile");
-		registerStorage(SQLiteStorage.class, "sqlite");
-		registerStorage(MySQLStorage.class, "mysql");
 		yggdrasil.registerSingleClass(Kleenean.class, "Kleenean");
 		yggdrasil.registerClassResolver(new ConfigurationSerializer<ConfigurationSerializable>() {
 			{
@@ -97,47 +94,21 @@ public abstract class Variables {
 			@Nullable
 			public String getID(final @NonNull Class<?> c) {
 				if (ConfigurationSerializable.class.isAssignableFrom(c) && Classes.getSuperClassInfo(c) == Classes.getExactClassInfo(Object.class))
-					return CONFIGURATION_SERIALIZABLE_PREFIX + ConfigurationSerialization.getAlias((Class<? extends ConfigurationSerializable>) c);
+					return configurationSerializablePrefix + ConfigurationSerialization.getAlias((Class<? extends ConfigurationSerializable>) c);
 				return null;
 			}
 			
 			@Override
 			@Nullable
 			public Class<? extends ConfigurationSerializable> getClass(final @NonNull String id) {
-				if (id.startsWith(CONFIGURATION_SERIALIZABLE_PREFIX))
-					return ConfigurationSerialization.getClassByAlias(id.substring(CONFIGURATION_SERIALIZABLE_PREFIX.length()));
+				if (id.startsWith(configurationSerializablePrefix))
+					return ConfigurationSerialization.getClassByAlias(id.substring(configurationSerializablePrefix.length()));
 				return null;
 			}
 		});
 	}
 
-	private final static String CONFIGURATION_SERIALIZABLE_PREFIX = "ConfigurationSerializable_";
-
-	final static List<VariablesStorage> storages = new ArrayList<>();
-
-	public static boolean caseInsensitiveVariables = true;
-
-	private Variables() {}
-
-	/**
-	 * Register a VariableStorage class for Skript to create if the user config value matches.
-	 *
-	 * @param <T> A class to extend VariableStorage.
-	 * @param storage The class of the VariableStorage implementation.
-	 * @param names The names used in the config of Skript to select this VariableStorage.
-	 * @return if the operation was successful, or if it's already registered.
-	 */
-	public static <T extends VariablesStorage> boolean registerStorage(Class<T> storage, String... names) {
-		for (String name : names) {
-			if (types.containsKey(name))
-				return false;
-			if (types.keySet().contains(name.toLowerCase(Locale.US)))
-				return false;
-		}
-		for (String name : names)
-			types.put(name.toLowerCase(Locale.US), storage);
-		return true;
-	}
+	static List<VariablesStorage> storages = new ArrayList<>();
 
 	public static boolean load() {
 		assert variables.treeMap.isEmpty();
@@ -184,33 +155,28 @@ public abstract class Variables {
 			boolean successful = true;
 			for (final Node node : (SectionNode) databases) {
 				if (node instanceof SectionNode) {
-					SectionNode section = (SectionNode) node;
-					String type = section.getValue("type");
+					final SectionNode n = (SectionNode) node;
+					final String type = n.getValue("type");
 					if (type == null) {
 						Skript.error("Missing entry 'type' in database definition");
 						successful = false;
 						continue;
 					}
 
-					String name = section.getKey();
+					final String name = n.getKey();
 					assert name != null;
-					VariablesStorage storage;
-					Optional<?> optional = types.entries().stream()
-							.filter(entry -> entry.getKey().equalsIgnoreCase(type))
-							.map(entry -> entry.getValue())
-							.findFirst();
-					if (!optional.isPresent()) {
+					final VariablesStorage s;
+					if (type.equalsIgnoreCase("csv") || type.equalsIgnoreCase("file") || type.equalsIgnoreCase("flatfile")) {
+						s = new FlatFileStorage(name);
+					} else if (type.equalsIgnoreCase("mysql")) {
+						s = new DatabaseStorage(name, Type.MYSQL);
+					} else if (type.equalsIgnoreCase("sqlite")) {
+						s = new DatabaseStorage(name, Type.SQLITE);
+					} else {
 						if (!type.equalsIgnoreCase("disabled") && !type.equalsIgnoreCase("none")) {
 							Skript.error("Invalid database type '" + type + "'");
 							successful = false;
 						}
-						continue;
-					}
-					try {
-						storage = (VariablesStorage) optional.get().getClass().getConstructor().newInstance();
-					} catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException | NoSuchMethodException | SecurityException e) {
-						Skript.error("Failed to initalize database type '" + type + "'");
-						successful = false;
 						continue;
 					}
 
@@ -224,8 +190,8 @@ public abstract class Variables {
 					if (Skript.logVeryHigh())
 						Skript.info("Loading database '" + node.getKey() + "'...");
 					
-					if (storage.load(section))
-						storages.add(storage);
+					if (s.load(n))
+						storages.add(s);
 					else
 						successful = false;
 					
@@ -236,7 +202,7 @@ public abstract class Variables {
 						d = tvs.size() - x;
 					}
 					if (Skript.logVeryHigh())
-						Skript.info("Loaded " + d + " variables from the database '" + section.getKey() + "' in " + ((System.currentTimeMillis() - start) / 100) / 10.0 + " seconds");
+						Skript.info("Loaded " + d + " variables from the database '" + n.getKey() + "' in " + ((System.currentTimeMillis() - start) / 100) / 10.0 + " seconds");
 				} else {
 					Skript.error("Invalid line in databases: databases must be defined as sections");
 					successful = false;
@@ -265,6 +231,7 @@ public abstract class Variables {
 		return true;
 	}
 
+	@SuppressWarnings("null")
 	private final static Pattern variableNameSplitPattern = Pattern.compile(Pattern.quote(Variable.SEPARATOR));
 	
 	@SuppressWarnings("null")
@@ -520,17 +487,21 @@ public abstract class Variables {
 		} finally {
 			variablesLock.writeLock().unlock();
 		}
-		
-		for (final VariablesStorage s : storages) {
-			if (s.accept(name)) {
-				if (s != source) {
-					final Value v = serialize(value);
-					s.save(name, v != null ? v.type : null, v != null ? v.data : null);
-					if (value != null)
-						source.save(name, null, null);
+
+		try {
+			for (final VariablesStorage s : storages) {
+				if (s.accept(name)) {
+					if (s != source) {
+						final Value v = serialize(value);
+						s.save(name, v != null ? v.type : null, v != null ? v.data : null);
+						if (value != null)
+							source.save(name, null, null);
+					}
+					return true;
 				}
-				return true;
 			}
+		} catch (Exception e) {
+			Skript.exception(e, "Error saving variable named " + name);
 		}
 		return false;
 	}
@@ -570,40 +541,42 @@ public abstract class Variables {
 		}
 	}
 	
-	public static SerializedVariable serialize(final String name, final @Nullable Object value) {
+	public static SerializedVariable serialize(String name, @Nullable Object value) {
 		assert Bukkit.isPrimaryThread();
-		final SerializedVariable.Value var = serialize(value);
+		SerializedVariable.Value var;
+		try {
+			var = serialize(value);
+		} catch (Exception e) {
+			throw Skript.exception(e, "Error saving variable named " + name);
+		}
 		return new SerializedVariable(name, var);
 	}
 	
-	public static SerializedVariable.@Nullable Value serialize(final @Nullable Object value) {
+	public static SerializedVariable.@Nullable Value serialize(@Nullable Object value) {
 		assert Bukkit.isPrimaryThread();
 		return Classes.serialize(value);
 	}
 
-	private static void saveVariableChange(final String name, final @Nullable Object value) {
+	private static void saveVariableChange(String name, @Nullable Object value) {
 		saveQueue.add(serialize(name, value));
 	}
 	
-	final static BlockingQueue<SerializedVariable> saveQueue = new LinkedBlockingQueue<>();
+	static final BlockingQueue<SerializedVariable> saveQueue = new LinkedBlockingQueue<>();
 	
 	static volatile boolean closed = false;
 	
-	private final static Thread saveThread = Skript.newThread(new Runnable() {
-		@Override
-		public void run() {
-			while (!closed) {
-				try {
-					// Save one variable change
-					SerializedVariable v = saveQueue.take();
-					for (VariablesStorage s : storages) {
-						if (s.accept(v.name)) {
-							s.save(v);
-							break;
-						}
+	private static final Thread saveThread = Skript.newThread(() -> {
+		while (!closed) {
+			try {
+				// Save one variable change
+				SerializedVariable v = saveQueue.take();
+				for (VariablesStorage s : storages) {
+					if (s.accept(v.name)) {
+						s.save(v);
+						break;
 					}
-				} catch (final InterruptedException e) {}
-			}
+				}
+			} catch (final InterruptedException ignored) {}
 		}
 	}, "Skript variable save thread");
 	
