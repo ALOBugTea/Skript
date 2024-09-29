@@ -81,7 +81,7 @@ public class ExprCmdCooldownInfo extends SimpleExpression<Object> {
 		if (!(e instanceof ScriptCommandEvent))
 			return null;
 		ScriptCommandEvent event = ((ScriptCommandEvent) e);
-		ScriptCommand scriptCommand = event.getScriptCommand();
+		ScriptCommand scriptCommand = event.getSkriptCommand();
 		
 		CommandSender sender = event.getSender();
 		if (scriptCommand.getCooldown() == null || !(sender instanceof Player))
@@ -133,7 +133,7 @@ public class ExprCmdCooldownInfo extends SimpleExpression<Object> {
 		if (!(e instanceof ScriptCommandEvent))
 			return;
 		ScriptCommandEvent commandEvent = (ScriptCommandEvent) e;
-		ScriptCommand command = commandEvent.getScriptCommand();
+		ScriptCommand command = commandEvent.getSkriptCommand();
 		Timespan cooldown = command.getCooldown();
 		CommandSender sender = commandEvent.getSender();
 		if (cooldown == null || !(sender instanceof Player))

@@ -22,7 +22,6 @@ import ch.njol.skript.Skript;
 import ch.njol.skript.aliases.Aliases;
 import ch.njol.skript.aliases.ItemType;
 import ch.njol.skript.aliases.MatchQuality;
-import ch.njol.skript.bukkitutil.ItemUtils;
 import ch.njol.skript.variables.Variables;
 import ch.njol.yggdrasil.Fields;
 import org.bukkit.Bukkit;
@@ -59,7 +58,7 @@ public class NewBlockCompat implements BlockCompat {
 		Material type;
 		BlockData data;
 		boolean isDefault;
-
+		
 		public NewBlockValues(Material type, BlockData data, boolean isDefault) {
 			if (type != data.getMaterial())
 				throw new IllegalArgumentException("'type' does not match material of 'data'");
@@ -72,7 +71,7 @@ public class NewBlockCompat implements BlockCompat {
 		 * For Serialization - INTERNAL USAGE ONLY!!
 		 */
 		private NewBlockValues() { }
-
+		
 		@Override
 		public boolean isDefault() {
 			return isDefault;
@@ -95,7 +94,7 @@ public class NewBlockCompat implements BlockCompat {
 			result = prime * result + type.hashCode();
 			return result;
 		}
-
+		
 		@Override
 		public String toString() {
 			return data.toString() + (isDefault ? " (default)" : "");
@@ -140,20 +139,20 @@ public class NewBlockCompat implements BlockCompat {
 			this.isDefault = isDefault;
 		}
 	}
-
+	
 	private static class NewBlockSetter implements BlockSetter {
-
+		
 		private ItemType floorTorch;
 		private ItemType wallTorch;
-
+		
 		private ItemType specialTorchSides;
 		private ItemType specialTorchFloors;
-
+		
 		private boolean typesLoaded = false;
-
+		
 		private static final BlockFace[] CARDINAL_FACES =
 			new BlockFace[] {BlockFace.NORTH, BlockFace.EAST, BlockFace.SOUTH, BlockFace.WEST};
-
+		
 		@SuppressWarnings("null") // Late initialization with loadTypes() to avoid circular dependencies
 		public NewBlockSetter() {}
 
@@ -161,7 +160,7 @@ public class NewBlockCompat implements BlockCompat {
 		public void setBlock(Block block, Material type, @Nullable BlockValues values, int flags) {
 			if (!typesLoaded)
 				loadTypes();
-
+			
 			boolean rotate = (flags | ROTATE) != 0;
 			boolean rotateForce = (flags | ROTATE_FORCE) != 0;
 			boolean rotateFixType = (flags | ROTATE_FIX_TYPE) != 0;
@@ -170,9 +169,9 @@ public class NewBlockCompat implements BlockCompat {
 			NewBlockValues ourValues = null;
 			if (values != null)
 				ourValues = (NewBlockValues) values;
-
+			
 			Class<?> dataType = type.data;
-
+			
 			/**
 			 * Set to true when block is placed. If no special logic places
 			 * the block, generic placement will be done.
@@ -191,7 +190,7 @@ public class NewBlockCompat implements BlockCompat {
 							canPlace = false;
 						}
 					}
-
+					
 					// Can't really place a floor torch, try wall one instead
 					if (!canPlace) {
 						BlockFace face = findWallTorchSide(block);
@@ -209,7 +208,7 @@ public class NewBlockCompat implements BlockCompat {
 						data = (Directional) ourValues.data;
 					else
 						data = (Directional) Bukkit.createBlockData(type);
-
+					
 					Block relative = block.getRelative(data.getFacing());
 					if ((!relative.getType().isOccluding() && !specialTorchSides.isOfType(relative)) || rotateForce) {
 						// Attempt to figure out a better rotation
@@ -223,7 +222,7 @@ public class NewBlockCompat implements BlockCompat {
 					}
 				}
 			}
-
+			
 			if (multipart) {
 				// Beds
 				if (Bed.class.isAssignableFrom(dataType)) {
@@ -232,11 +231,11 @@ public class NewBlockCompat implements BlockCompat {
 						data = (Bed) ourValues.data.clone();
 					else
 						data = (Bed) Bukkit.createBlockData(type);
-
+					
 					// Place this bed
 					block.setType(type, false);
 					block.setBlockData(data, applyPhysics);
-
+					
 					// Calculate rotation and location of other part
 					BlockFace facing = data.getFacing();
 					BlockFace otherFacing = facing;
@@ -245,18 +244,18 @@ public class NewBlockCompat implements BlockCompat {
 						facing = facing.getOppositeFace();
 						otherPart = Bed.Part.FOOT;
 					}
-
+					
 					// Place the other part
 					Block other = block.getRelative(facing);
 					other.setType(type, false);
-
+					
 					data.setPart(otherPart);
 					data.setFacing(otherFacing);
 					other.setBlockData(data, applyPhysics);
-
+					
 					placed = true;
 				}
-
+				
 				// Top-down bisected blocks (doors etc.)
 				if (Bisected.class.isAssignableFrom(dataType) && !Tag.STAIRS.isTagged(type) && !Tag.TRAPDOORS.isTagged(type)) {
 					Bisected data;
@@ -264,11 +263,11 @@ public class NewBlockCompat implements BlockCompat {
 						data = (Bisected) ourValues.data.clone();
 					else
 						data = (Bisected) Bukkit.createBlockData(type);
-
+					
 					// Place this part
 					block.setType(type, false);
 					block.setBlockData(data, applyPhysics);
-
+					
 					// Figure out place of other part
 					BlockFace facing = BlockFace.DOWN;
 					Bisected.Half otherHalf = Bisected.Half.BOTTOM;
@@ -276,18 +275,18 @@ public class NewBlockCompat implements BlockCompat {
 						facing = BlockFace.UP;
 						otherHalf = Bisected.Half.TOP;
 					}
-
+					
 					// Place the other block
 					Block other = block.getRelative(facing);
 					other.setType(type, false);
-
+					
 					data.setHalf(otherHalf);
 					other.setBlockData(data, applyPhysics);
-
+					
 					placed = true;
 				}
 			}
-
+			
 			// Generic block placement
 			if (!placed) {
 				block.setType(type);
@@ -295,14 +294,14 @@ public class NewBlockCompat implements BlockCompat {
 					block.setBlockData(ourValues.data, applyPhysics);
 			}
 		}
-
+		
 		private void loadTypes() {
 			floorTorch = Aliases.javaItemType("floor torch");
 			wallTorch = Aliases.javaItemType("wall torch");
-
+			
 			specialTorchSides = Aliases.javaItemType("special torch sides");
 			specialTorchFloors = Aliases.javaItemType("special torch floors");
-
+			
 			typesLoaded = true;
 		}
 
@@ -313,20 +312,20 @@ public class NewBlockCompat implements BlockCompat {
 				if (relative.getType().isOccluding() || specialTorchSides.isOfType(relative))
 					return face.getOppositeFace(); // Torch can be rotated towards from this face
 			}
-
+			
 			return null; // Can't place torch here legally
 		}
-
+		
 		@Override
 		public void sendBlockChange(Player player, Location location, Material type, @Nullable BlockValues values) {
 			BlockData blockData = values != null ? ((NewBlockValues) values).data : type.createBlockData();
 			player.sendBlockChange(location, blockData);
 		}
-
+		
 	}
-
+	
 	private NewBlockSetter setter = new NewBlockSetter();
-
+	
 	@Nullable
 	@Override
 	public BlockValues getBlockValues(BlockState block) {
@@ -335,7 +334,7 @@ public class NewBlockCompat implements BlockCompat {
 			return new NewBlockValues(block.getType(), block.getBlockData(), false);
 		return null;
 	}
-
+	
 	@Override
 	@Nullable
 	public BlockValues getBlockValues(ItemStack stack) {
@@ -346,7 +345,7 @@ public class NewBlockCompat implements BlockCompat {
 		}
 		return null;
 	}
-
+	
 	@Override
 	public BlockSetter getSetter() {
 		return setter;
@@ -372,7 +371,7 @@ public class NewBlockCompat implements BlockCompat {
 				return null;
 			}
 		}
-
+		
 		StringBuilder combined = new StringBuilder("[");
 		boolean first = true;
 		for (Map.Entry<String, String> entry : states.entrySet()) {
@@ -383,7 +382,7 @@ public class NewBlockCompat implements BlockCompat {
 			combined.append(entry.getKey()).append('=').append(entry.getValue());
 		}
 		combined.append(']');
-
+		
 		try {
 			BlockData data =  Bukkit.createBlockData(type, combined.toString());
 			assert data != null;
@@ -405,5 +404,5 @@ public class NewBlockCompat implements BlockCompat {
 	public boolean isLiquid(Material type) {
 		return type == Material.WATER || type == Material.LAVA;
 	}
-
+	
 }

@@ -21,7 +21,6 @@ package ch.njol.skript.events;
 import org.bukkit.block.Block;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
-import org.bukkit.entity.Vehicle;
 import org.bukkit.event.Event;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerEvent;
@@ -32,41 +31,57 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.eclipse.jdt.annotation.Nullable;
-import org.skriptlang.skript.lang.comparator.Relation;
 
 import ch.njol.skript.Skript;
 import ch.njol.skript.aliases.ItemType;
 import ch.njol.skript.bukkitutil.ClickEventTracker;
+import ch.njol.skript.classes.Comparator.Relation;
 import ch.njol.skript.classes.data.DefaultComparators;
 import ch.njol.skript.entity.EntityData;
 import ch.njol.skript.lang.Literal;
 import ch.njol.skript.lang.SkriptEvent;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
+import ch.njol.skript.log.ErrorQuality;
 import ch.njol.util.Checker;
 import ch.njol.util.coll.CollectionUtils;
 
+@SuppressWarnings("unchecked")
 public class EvtClick extends SkriptEvent {
-
+	
+	/**
+	 * Two hands available.
+	 */
+	final static boolean twoHanded = Skript.isRunningMinecraft(1, 9);
+	
+	/**
+	 * If a hand has item, it will always be used when the other hand has
+	 * nothing.
+	 */
+	final static boolean alwaysPreferItem = !Skript.isRunningMinecraft(1, 13);
+	
 	/**
 	 * Click types.
 	 */
 	private final static int RIGHT = 1, LEFT = 2, ANY = RIGHT | LEFT;
-
+	
 	/**
 	 * Tracks PlayerInteractEvents to deduplicate them.
 	 */
 	public static final ClickEventTracker interactTracker = new ClickEventTracker(Skript.getInstance());
-
+	
+	/**
+	 * Tracks PlayerInteractEntityEvents to deduplicate them.
+	 */
+	private static final ClickEventTracker entityInteractTracker = new ClickEventTracker(Skript.getInstance());
+	
 	static {
-		Class<? extends PlayerEvent>[] eventTypes = CollectionUtils.array(
-			PlayerInteractEvent.class, PlayerInteractEntityEvent.class, PlayerInteractAtEntityEvent.class
-		);
+		Class<? extends PlayerEvent>[] eventTypes = CollectionUtils.array(PlayerInteractEvent.class, PlayerInteractEntityEvent.class);
+		
 		Skript.registerEvent("Click", EvtClick.class, eventTypes,
-				"[(" + RIGHT + ":right|" + LEFT + ":left)(| |-)][mouse(| |-)]click[ing] [on %-entitydata/itemtype%] [(with|using|holding) %-itemtype%]",
-				"[(" + RIGHT + ":right|" + LEFT + ":left)(| |-)][mouse(| |-)]click[ing] (with|using|holding) %itemtype% on %entitydata/itemtype%")
+				"[(" + RIGHT + "¦right|" + LEFT + "¦left)(| |-)][mouse(| |-)]click[ing] [on %-entitydata/itemtype%] [(with|using|holding) %itemtype%]",
+				"[(" + RIGHT + "¦right|" + LEFT + "¦left)(| |-)][mouse(| |-)]click[ing] (with|using|holding) %itemtype% on %entitydata/itemtype%")
 				.description("Called when a user clicks on a block, an entity or air with or without an item in their hand.",
-						"Please note that rightclick events with an empty hand while not looking at a block are not sent to the server, so there's no way to detect them.",
-						"Also note that a leftclick on an entity is an attack and thus not covered by the 'click' event, but the 'damage' event.")
+						"Please note that rightclick events with an empty hand while not looking at a block are not sent to the server, so there's no way to detect them.")
 				.examples("on click:",
 						"on rightclick holding a fishing rod:",
 						"on leftclick on a stone or obsidian:",
@@ -74,59 +89,47 @@ public class EvtClick extends SkriptEvent {
 						"on click with a sword:")
 				.since("1.0");
 	}
-
+	
 	/**
 	 * Only trigger when one of these is interacted with.
 	 */
 	@Nullable
-	private Literal<?> type;
-
+	private Literal<?> types = null;
+	
 	/**
 	 * Only trigger when then item player clicks with is one of these.
 	 */
 	@Nullable
 	private Literal<ItemType> tools;
-
+	
 	/**
 	 * Click types to trigger.
 	 */
 	private int click = ANY;
-
+	
 	@Override
-	@SuppressWarnings("unchecked")
-	public boolean init(Literal<?>[] args, int matchedPattern, ParseResult parseResult) {
-		click = parseResult.mark == 0 ? ANY : parseResult.mark;
-		type = args[matchedPattern];
-		if (type != null && !ItemType.class.isAssignableFrom(type.getReturnType())) {
-			Literal<EntityData<?>> entitydata = (Literal<EntityData<?>>) type;
+	public boolean init(final Literal<?>[] args, final int matchedPattern, final ParseResult parser) {
+		click = parser.mark == 0 ? ANY : parser.mark;
+		types = args[matchedPattern];
+		if (types != null && !ItemType.class.isAssignableFrom(types.getReturnType())) {
 			if (click == LEFT) {
-				if (Vehicle.class.isAssignableFrom(entitydata.getSingle().getType())) {
-					Skript.error("A leftclick on an entity is an attack and thus not covered by the 'click' event, but the 'vehicle damage' event.");
-				} else {
-					Skript.error("A leftclick on an entity is an attack and thus not covered by the 'click' event, but the 'damage' event.");
-				}
+				Skript.error("A leftclick on an entity is an attack and thus not covered by the 'click' event, but the 'damage' event.", ErrorQuality.SEMANTIC_ERROR);
 				return false;
 			} else if (click == ANY) {
-				if (Vehicle.class.isAssignableFrom(entitydata.getSingle().getType())) {
-					Skript.error("A leftclick on an entity is an attack and thus not covered by the 'click' event, but the 'vehicle damage' event. " +
-							"Change this event to a rightclick to fix this warning message.");
-				} else {
-					Skript.error("A leftclick on an entity is an attack and thus not covered by the 'click' event, but the 'damage' event. " +
-							"Change this event to a rightclick to fix this warning message.");
-				}
+				Skript.warning("A leftclick on an entity is an attack and thus not covered by the 'click' event, but the 'damage' event. Change this event to a rightclick to disable this warning message.");
 			}
 		}
 		tools = (Literal<ItemType>) args[1 - matchedPattern];
 		return true;
 	}
-
+	
 	@Override
-	public boolean check(Event event) {
-		Block block;
-		Entity entity;
+	public boolean check(final Event e) {
+		final Block block;
+		final Entity entity;
 		
-		if (event instanceof PlayerInteractEntityEvent) {
-			PlayerInteractEntityEvent clickEvent = ((PlayerInteractEntityEvent) event);
+		if (e instanceof PlayerInteractEntityEvent) {
+			PlayerInteractEntityEvent clickEvent = ((PlayerInteractEntityEvent) e);
 			Entity clicked = clickEvent.getRightClicked();
 			
 			// Usually, don't handle these events
@@ -141,16 +144,16 @@ public class EvtClick extends SkriptEvent {
 				return false;
 			
 			// PlayerInteractAtEntityEvent called only once for armor stands
-			if (!(event instanceof PlayerInteractAtEntityEvent)) {
-				if (!interactTracker.checkEvent(clickEvent.getPlayer(), clickEvent, clickEvent.getHand())) {
+			if (!(e instanceof PlayerInteractAtEntityEvent)) {
+				if (!entityInteractTracker.checkEvent(clickEvent.getPlayer(), clickEvent, clickEvent.getHand())) {
 					return false; // Not first event this tick
 				}
 			}
 			
 			entity = clicked;
 			block = null;
-		} else if (event instanceof PlayerInteractEvent) {
-			PlayerInteractEvent clickEvent = ((PlayerInteractEvent) event);
+		} else if (e instanceof PlayerInteractEvent) {
+			PlayerInteractEvent clickEvent = ((PlayerInteractEvent) e);
 			
 			// Figure out click type, filter non-click events
 			Action a = clickEvent.getAction();
@@ -184,14 +187,14 @@ public class EvtClick extends SkriptEvent {
 			return false;
 		}
 		
-		if (tools != null && !tools.check(event, new Checker<ItemType>() {
+		if (tools != null && !tools.check(e, new Checker<ItemType>() {
 			@Override
 			public boolean check(final ItemType t) {
-				if (event instanceof PlayerInteractEvent) {
-					return t.isOfType(((PlayerInteractEvent) event).getItem());
+				if (e instanceof PlayerInteractEvent) {
+					return t.isOfType(((PlayerInteractEvent) e).getItem());
 				} else { // PlayerInteractEntityEvent doesn't have item associated with it
-					PlayerInventory invi = ((PlayerInteractEntityEvent) event).getPlayer().getInventory();
-					ItemStack item = ((PlayerInteractEntityEvent) event).getHand() == EquipmentSlot.HAND
+					PlayerInventory invi = ((PlayerInteractEntityEvent) e).getPlayer().getInventory();
+					ItemStack item = ((PlayerInteractEntityEvent) e).getHand() == EquipmentSlot.HAND
 							? invi.getItemInMainHand() : invi.getItemInOffHand();
 					return t.isOfType(item);
 				}
@@ -200,12 +203,12 @@ public class EvtClick extends SkriptEvent {
 			return false;
 		}
 		
-		if (type != null) {
-			return type.check(event, new Checker<Object>() {
+		if (types != null) {
+			return types.check(e, new Checker<Object>() {
 				@Override
 				public boolean check(final Object o) {
 					if (entity != null) {
-						return o instanceof EntityData ? ((EntityData<?>) o).isInstance(entity) : Relation.EQUAL.isImpliedBy(DefaultComparators.entityItemComparator.compare(EntityData.fromEntity(entity), (ItemType) o));
+						return o instanceof EntityData ? ((EntityData<?>) o).isInstance(entity) : Relation.EQUAL.is(DefaultComparators.entityItemComparator.compare(EntityData.fromEntity(entity), (ItemType) o));
 					} else {
 						return o instanceof EntityData ? false : ((ItemType) o).isOfType(block);
 					}
@@ -214,10 +217,10 @@ public class EvtClick extends SkriptEvent {
 		}
 		return true;
 	}
-
+	
 	@Override
-	public String toString(@Nullable Event e, boolean debug) {
-		return (click == LEFT ? "left" : click == RIGHT ? "right" : "") + "click" + (type != null ? " on " + type.toString(e, debug) : "") + (tools != null ? " holding " + tools.toString(e, debug) : "");
+	public String toString(final @Nullable Event e, final boolean debug) {
+		return (click == LEFT ? "left" : click == RIGHT ? "right" : "") + "click" + (types != null ? " on " + types.toString(e, debug) : "") + (tools != null ? " holding " + tools.toString(e, debug) : "");
 	}
-
+	
 }

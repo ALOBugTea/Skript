@@ -18,14 +18,15 @@
  */
 package ch.njol.skript.classes;
 
-import ch.njol.skript.lang.Debuggable;
-import ch.njol.skript.registrations.Classes;
-import org.bukkit.event.Event;
-import org.eclipse.jdt.annotation.Nullable;
-import org.skriptlang.skript.lang.converter.Converters;
-
 import java.util.Arrays;
 import java.util.stream.Collectors;
+
+import org.bukkit.event.Event;
+import org.eclipse.jdt.annotation.Nullable;
+
+import ch.njol.skript.lang.Debuggable;
+import ch.njol.skript.registrations.Classes;
+import ch.njol.skript.registrations.Converters;
 
 /**
  * Converts data from type to another.
@@ -33,9 +34,7 @@ import java.util.stream.Collectors;
  * @param <F> The accepted type of objects to convert <b>f</b>rom
  * @param <T> The type to convert <b>t</b>o
  * @see Converters#registerConverter(Class, Class, Converter)
- * @deprecated Use {@link org.skriptlang.skript.lang.converter.Converter}
  */
-@Deprecated
 public interface Converter<F, T> {
 	
 	/**
@@ -97,7 +96,7 @@ public interface Converter<F, T> {
 		}
 
 		@Override
-		public String toString(@Nullable Event event, boolean debug) {
+		public String toString(@Nullable Event e, boolean debug) {
 			if (debug) {
 				String str = Arrays.stream(chain).map(c -> Classes.getExactClassName(c)).collect(Collectors.joining(" -> "));
 				assert str != null;

@@ -21,7 +21,6 @@ package ch.njol.skript.lang.function;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 
 import org.eclipse.jdt.annotation.Nullable;
 
@@ -51,136 +50,74 @@ public class Namespace {
 	public static class Key {
 		
 		private final Origin origin;
+		
+		private final String name;
 
-		@Nullable
-		private final String scriptName;
-
-		public Key(Origin origin, @Nullable String scriptName) {
+		public Key(Origin origin, String name) {
 			super();
 			this.origin = origin;
-			this.scriptName = scriptName;
+			this.name = name;
 		}
 		
 		public Origin getOrigin() {
 			return origin;
 		}
-
-		@Nullable
-		public String getScriptName() {
-			return scriptName;
-		}
-
-		@Override
-		public int hashCode() {
-			int result = origin.hashCode();
-			result = 31 * result + (scriptName != null ? scriptName.hashCode() : 0);
-			return result;
-		}
-
-		@Override
-		public boolean equals(Object object) {
-			if (this == object)
-				return true;
-			if (object == null || getClass() != object.getClass())
-				return false;
-
-			Key other = (Key) object;
-
-			if (origin != other.origin)
-				return false;
-			return Objects.equals(scriptName, other.scriptName);
-		}
-	}
-
-	/**
-	 * The key used in the signature and function maps
-	 */
-	private static class Info {
-
-		/**
-		 * Name of the function
-		 */
-		private final String name;
-
-		/**
-		 * Whether the function is local
-		 */
-		private final boolean local;
-
-		public Info(String name, boolean local) {
-			this.name = name;
-			this.local = local;
-		}
-
+		
 		public String getName() {
 			return name;
 		}
 
-		public boolean isLocal() {
-			return local;
-		}
-
 		@Override
 		public int hashCode() {
-			int result = getName().hashCode();
-			result = 31 * result + (isLocal() ? 1 : 0);
+			int prime = 31;
+			int result = 1;
+			result = prime * result + name.hashCode();
+			result = prime * result + origin.hashCode();
 			return result;
 		}
 
 		@Override
-		public boolean equals(Object o) {
-			if (this == o)
+		public boolean equals(@Nullable Object obj) {
+			if (this == obj)
 				return true;
-			if (!(o instanceof Info))
+			if (obj == null)
 				return false;
-
-			Info info = (Info) o;
-
-			if (isLocal() != info.isLocal())
+			if (getClass() != obj.getClass())
 				return false;
-			return getName().equals(info.getName());
+			Key other = (Key) obj;
+			if (!name.equals(other.name))
+				return false;
+			if (origin != other.origin)
+				return false;
+			return true;
 		}
 	}
 	
 	/**
 	 * Signatures of known functions.
 	 */
-	private final Map<Info, Signature<?>> signatures;
-
+	private final Map<String, Signature<?>> signatures;
+	
 	/**
 	 * Known functions. Populated as function bodies are loaded.
 	 */
-	private final Map<Info, Function<?>> functions;
-
+	private final Map<String, Function<?>> functions;
+	
 	public Namespace() {
 		this.signatures = new HashMap<>();
 		this.functions = new HashMap<>();
 	}
 	
 	@Nullable
-	public Signature<?> getSignature(String name, boolean local) {
-		return signatures.get(new Info(name, local));
-	}
-
-	@Nullable
 	public Signature<?> getSignature(String name) {
-		Signature<?> signature = getSignature(name, true);
-		return signature == null ? getSignature(name, false) : signature;
+		return signatures.get(name);
 	}
-
+	
 	public void addSignature(Signature<?> sign) {
-		Info info = new Info(sign.getName(), sign.local);
-		if (signatures.containsKey(info))
+		if (signatures.containsKey(sign.getName())) {
 			throw new IllegalArgumentException("function name already used");
-		signatures.put(info, sign);
-	}
-
-	public boolean removeSignature(Signature<?> sign) {
-		Info info = new Info(sign.getName(), sign.local);
-		if (signatures.get(info) != sign)
-			return false;
-		signatures.remove(info);
-		return true;
+		}
+		signatures.put(sign.getName(), sign);
 	}
 	
 	@SuppressWarnings("null")
@@ -189,20 +126,13 @@ public class Namespace {
 	}
 	
 	@Nullable
-	public Function<?> getFunction(String name, boolean local) {
-		return functions.get(new Info(name, local));
-	}
-
-	@Nullable
 	public Function<?> getFunction(String name) {
-		Function<?> function = getFunction(name, true);
-		return function == null ? getFunction(name, false) : function;
+		return functions.get(name);
 	}
-
+	
 	public void addFunction(Function<?> func) {
-		Info info = new Info(func.getName(), func.getSignature().local);
-		assert signatures.containsKey(info) : "missing signature for function";
-		functions.put(info, func);
+		assert signatures.containsKey(func.getName()) : "missing signature for function";
+		functions.put(func.getName(), func);
 	}
 
 	@SuppressWarnings("null")

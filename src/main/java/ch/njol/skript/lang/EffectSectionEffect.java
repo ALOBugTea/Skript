@@ -23,9 +23,6 @@ import ch.njol.util.Kleenean;
 import org.bukkit.event.Event;
 import org.eclipse.jdt.annotation.Nullable;
 
-/**
- * Represents the Effect aspect of an EffectSection. This allows for the use of EffectSections as effects, rather than just sections.
- */
 public class EffectSectionEffect extends Effect {
 
 	private final EffectSection effectSection;
@@ -35,16 +32,16 @@ public class EffectSectionEffect extends Effect {
 	}
 
 	@Override
-	public boolean init(Expression<?>[] expressions, int matchedPattern, Kleenean isDelayed, ParseResult parseResult) {
-		return effectSection.init(expressions, matchedPattern, isDelayed, parseResult);
+	public boolean init(Expression<?>[] exprs, int matchedPattern, Kleenean isDelayed, ParseResult parseResult) {
+		return effectSection.init(exprs, matchedPattern, isDelayed, parseResult);
 	}
 
 	@Override
-	protected void execute(Event event) { }
+	protected void execute(Event e) { }
 
 	@Override
-	protected @Nullable TriggerItem walk(Event event) {
-		return effectSection.walk(event);
+	protected @Nullable TriggerItem walk(Event e) {
+		return effectSection.walk(e);
 	}
 
 	@Override
@@ -68,8 +65,8 @@ public class EffectSectionEffect extends Effect {
 	}
 
 	@Override
-	public String toString(@Nullable Event event, boolean debug) {
-		return effectSection.toString(event, debug);
+	public String toString(@Nullable Event e, boolean debug) {
+		return effectSection.toString(e, debug);
 	}
 
 }

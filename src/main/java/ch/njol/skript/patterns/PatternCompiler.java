@@ -42,10 +42,8 @@ public class PatternCompiler {
 
 	/**
 	 * Parses a pattern String into a {@link SkriptPattern}.
-	 *
-	 * @throws MalformedPatternException when the given pattern is malformed.
 	 */
-	public static SkriptPattern compile(String pattern) throws MalformedPatternException {
+	public static SkriptPattern compile(String pattern) {
 		AtomicInteger atomicInteger = new AtomicInteger(0);
 		try {
 			PatternElement first = compile(pattern, atomicInteger);

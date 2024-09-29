@@ -23,7 +23,7 @@ import java.util.Locale;
 import org.eclipse.jdt.annotation.Nullable;
 
 import ch.njol.skript.Skript;
-import org.skriptlang.skript.lang.converter.Converter;
+import ch.njol.skript.classes.Converter;
 
 /**
  * @author Peter Güttinger

@@ -46,10 +46,6 @@ public class OptionalPatternElement extends PatternElement {
 		return matchNext(expr, matchResult);
 	}
 
-	public PatternElement getPatternElement() {
-		return patternElement;
-	}
-
 	@Override
 	public String toString() {
 		return "[" + patternElement.toFullString() + "]";

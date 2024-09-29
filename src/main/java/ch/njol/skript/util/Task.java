@@ -67,6 +67,7 @@ public abstract class Task implements Runnable, Closeable {
 	 * 
 	 * @param delay
 	 */
+	@SuppressWarnings("deprecation")
 	private void schedule(final long delay) {
 		assert !isAlive();
 		if (!Skript.getInstance().isEnabled())
@@ -74,13 +75,17 @@ public abstract class Task implements Runnable, Closeable {
 		
 		if (period == -1) {
 			if (async) {
-				taskID = Bukkit.getScheduler().runTaskLaterAsynchronously(plugin, this, delay).getTaskId();
+				taskID = Skript.isRunningMinecraft(1, 4, 6) ?
+						Bukkit.getScheduler().runTaskLaterAsynchronously(plugin, this, delay).getTaskId() :
+						Bukkit.getScheduler().scheduleAsyncDelayedTask(plugin, this, delay);
 			} else {
 				taskID = Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, this, delay);
 			}
 		} else {
 			if (async) {
-				taskID = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, this, delay, period).getTaskId();
+				taskID = Skript.isRunningMinecraft(1, 4, 6) ?
+						Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, this, delay, period).getTaskId() :
+						Bukkit.getScheduler().scheduleAsyncRepeatingTask(plugin, this, delay, period);
 			} else {
 				taskID = Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, this, delay, period);
 			}

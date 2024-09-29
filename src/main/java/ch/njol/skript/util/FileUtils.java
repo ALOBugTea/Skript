@@ -29,7 +29,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 
-import org.skriptlang.skript.lang.converter.Converter;
+import ch.njol.skript.classes.Converter;
 
 /**
  * @author Peter Güttinger

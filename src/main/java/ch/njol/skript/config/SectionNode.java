@@ -18,6 +18,17 @@
  */
 package ch.njol.skript.config;
 
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.regex.Pattern;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+
+import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.Nullable;
+
 import ch.njol.skript.Skript;
 import ch.njol.skript.SkriptAPIException;
 import ch.njol.skript.config.validate.EntryValidator;
@@ -27,16 +38,6 @@ import ch.njol.util.NonNullPair;
 import ch.njol.util.NullableChecker;
 import ch.njol.util.coll.CollectionUtils;
 import ch.njol.util.coll.iterator.CheckedIterator;
-import org.eclipse.jdt.annotation.NonNull;
-import org.eclipse.jdt.annotation.Nullable;
-
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Pattern;
 
 /**
  * @author Peter Güttinger
@@ -269,17 +270,13 @@ public class SectionNode extends Node implements Iterable<Node> {
 	
 	private static final Pattern fullLinePattern = Pattern.compile("([^#]|##)*#-#(\\s.*)?");
 	
-	private SectionNode load_i(final ConfigReader r) throws IOException {
+	private final SectionNode load_i(final ConfigReader r) throws IOException {
 		boolean indentationSet = false;
 		String fullLine;
-		AtomicBoolean inBlockComment = new AtomicBoolean(false);
-		int blockCommentStartLine = -1;
 		while ((fullLine = r.readLine()) != null) {
 			SkriptLogger.setNode(this);
-
-			if (!inBlockComment.get()) // this will be updated for the last time at the start of the comment
-				blockCommentStartLine = this.getLine();
-			final NonNullPair<String, String> line = Node.splitLine(fullLine, inBlockComment);
+			
+			final NonNullPair<String, String> line = Node.splitLine(fullLine);
 			String value = line.getFirst();
 			final String comment = line.getSecond();
 			
@@ -366,9 +363,7 @@ public class SectionNode extends Node implements Iterable<Node> {
 			}
 			
 		}
-		if (inBlockComment.get()) {
-			Skript.error("A block comment (###) was opened on line " + blockCommentStartLine + " but never closed.");
-		}
+		
 		SkriptLogger.setNode(parent);
 		
 		return this;
@@ -451,80 +446,45 @@ public class SectionNode extends Node implements Iterable<Node> {
 		}
 		return r;
 	}
-
+	
 	/**
-	 * Updates the values of this SectionNode based on the values of another SectionNode.
-	 * @param other The other SectionNode.
-	 * @param excluded Keys to exclude from this update.
-	 * @return True if there are differences in the keys of this SectionNode and the other SectionNode.
+	 * @param other
+	 * @param excluded keys and sections to exclude
+	 * @return <tt>false</tt> if this and the other SectionNode contain the exact same set of keys
 	 */
-	public boolean setValues(SectionNode other, String... excluded) {
-		return modify(other, false, excluded);
-	}
-
-	/**
-	 * Compares the keys and values of this SectionNode and another.
-	 * @param other The other SectionNode.
-	 * @param excluded Keys to exclude from this comparison.
-	 * @return True if there are no differences in the keys and their values
-	 *  of this SectionNode and the other SectionNode.
-	 */
-	public boolean compareValues(SectionNode other, String... excluded) {
-		return !modify(other, true, excluded); // invert as "modify" returns true if different
-	}
-
-	private boolean modify(SectionNode other, boolean compareValues, String... excluded) {
-		boolean different = false;
-
-		for (Node node : this) {
-			if (CollectionUtils.containsIgnoreCase(excluded, node.key))
+	public boolean setValues(final SectionNode other, final String... excluded) {
+		boolean r = false;
+		for (final Node n : this) {
+			if (CollectionUtils.containsIgnoreCase(excluded, n.key))
 				continue;
-
-			Node otherNode = other.get(node.key);
-			if (otherNode != null) { // other has this key
-				if (node instanceof SectionNode) {
-					if (otherNode instanceof SectionNode) {
-						different |= ((SectionNode) node).modify((SectionNode) otherNode, compareValues);
-					} else { // Our node type is different from the old one
-						different = true;
-						if (compareValues) // Counting values means we don't need to copy over values
-							break;
+			final Node o = other.get(n.key);
+			if (o == null) {
+				r = true;
+			} else {
+				if (n instanceof SectionNode) {
+					if (o instanceof SectionNode) {
+						r |= ((SectionNode) n).setValues((SectionNode) o);
+					} else {
+						r = true;
 					}
-				} else if (node instanceof EntryNode) {
-					if (otherNode instanceof EntryNode) {
-						String ourValue = ((EntryNode) node).getValue();
-						String theirValue = ((EntryNode) otherNode).getValue();
-						if (compareValues) {
-							if (!ourValue.equals(theirValue)) {
-								different = true;
-								break; // Counting values means we don't need to copy over values
-							}
-						} else { // If we don't care about values, just copy over the old one
-							((EntryNode) node).setValue(theirValue);
-						}
-					} else { // Our node type is different from the old one
-						different = true;
-						if (compareValues) // Counting values means we don't need to copy over values
-							break;
+				} else if (n instanceof EntryNode) {
+					if (o instanceof EntryNode) {
+						((EntryNode) n).setValue(((EntryNode) o).getValue());
+					} else {
+						r = true;
 					}
 				}
-			} else { // other is missing this key (which means we have a new key)
-				different = true;
-				if (compareValues) // Counting values means we don't need to copy over values
-					break;
 			}
 		}
-
-		if (!different) {
-			for (Node otherNode : other) {
-				if (this.get(otherNode.key) == null) {
-					different = true;
+		if (!r) {
+			for (final Node o : other) {
+				if (this.get(o.key) == null) {
+					r = true;
 					break;
 				}
 			}
 		}
-
-		return different;
+		return r;
 	}
 	
 }

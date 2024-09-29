@@ -161,7 +161,7 @@ public abstract class Function<T> {
 
 	@Override
 	public String toString() {
-		return (sign.local ? "local " : "") + "function " + sign.getName();
+		return "function " + sign.getName();
 	}
 	
 }

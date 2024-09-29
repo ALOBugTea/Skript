@@ -77,7 +77,6 @@ public class DefaultChangers {
 				}
 				return;
 			}
-			boolean hasItem = false;
 			for (final Entity e : entities) {
 				for (final Object d : delta) {
 					if (d instanceof PotionEffectType) {
@@ -91,18 +90,16 @@ public class DefaultChangers {
 							if (d instanceof Experience) {
 								p.giveExp(((Experience) d).getXP());
 							} else if (d instanceof Inventory) {
-								PlayerInventory inventory = p.getInventory();
-								for (ItemStack itemStack : (Inventory) d) {
-									if (itemStack == null)
-										continue;
-									if (mode == ChangeMode.ADD) {
-										inventory.addItem(itemStack);
-									} else {
-										inventory.remove(itemStack);
+								final PlayerInventory invi = p.getInventory();
+								if (mode == ChangeMode.ADD) {
+									for (final ItemStack i : (Inventory) d) {
+										if (i != null)
+											invi.addItem(i);
 									}
+								} else {
+									invi.removeItem(((Inventory) d).getContents());
 								}
 							} else if (d instanceof ItemType) {
-								hasItem = true;
 								final PlayerInventory invi = p.getInventory();
 								if (mode == ChangeMode.ADD)
 									((ItemType) d).addTo(invi);
@@ -114,7 +111,7 @@ public class DefaultChangers {
 						}
 					}
 				}
-				if (e instanceof Player && hasItem)
+				if (e instanceof Player)
 					PlayerUtils.updateInventory((Player) e);
 			}
 		}
@@ -262,10 +259,7 @@ public class DefaultChangers {
 						for (final Object d : delta) {
 							if (d instanceof Inventory) {
 								assert mode == ChangeMode.REMOVE;
-								for (ItemStack itemStack : (Inventory) d) {
-									if (itemStack != null)
-										invi.removeItem(itemStack);
-								}
+								invi.removeItem(((Inventory) d).getContents());
 							} else {
 								if (mode == ChangeMode.REMOVE)
 									((ItemType) d).removeFrom(invi);
@@ -292,22 +286,25 @@ public class DefaultChangers {
 			if (mode == ChangeMode.RESET)
 				return null; // REMIND regenerate?
 			if (mode == ChangeMode.SET)
-				return CollectionUtils.array(ItemType.class, BlockData.class);
+				if (Skript.classExists("org.bukkit.block.data.BlockData"))
+					return CollectionUtils.array(ItemType.class, BlockData.class);
+				else
+					return CollectionUtils.array(ItemType.class);
 			return CollectionUtils.array(ItemType[].class, Inventory[].class);
 		}
 		
 		@Override
 		public void change(final Block[] blocks, final @Nullable Object[] delta, final ChangeMode mode) {
-			for (Block block : blocks) {
+			for (final Block block : blocks) {
 				assert block != null;
 				switch (mode) {
 					case SET:
 						assert delta != null;
-						Object object = delta[0];
-						if (object instanceof ItemType) {
-							((ItemType) object).getBlock().setBlock(block, true);
-						} else if (object instanceof BlockData) {
-							block.setBlockData(((BlockData) object));
+						Object o = delta[0];
+						if (o instanceof ItemType) {
+							((ItemType) delta[0]).getBlock().setBlock(block, true);
+						} else if (o instanceof BlockData) {
+							block.setBlockData(((BlockData) o));
 						}
 						break;
 					case DELETE:
@@ -317,30 +314,30 @@ public class DefaultChangers {
 					case REMOVE:
 					case REMOVE_ALL:
 						assert delta != null;
-						BlockState state = block.getState();
+						final BlockState state = block.getState();
 						if (!(state instanceof InventoryHolder))
 							break;
-						Inventory invi = ((InventoryHolder) state).getInventory();
+						final Inventory invi = ((InventoryHolder) state).getInventory();
 						if (mode == ChangeMode.ADD) {
-							for (Object obj : delta) {
-								if (obj instanceof Inventory) {
-									for (ItemStack i : (Inventory) obj) {
+							for (final Object d : delta) {
+								if (d instanceof Inventory) {
+									for (final ItemStack i : (Inventory) d) {
 										if (i != null)
 											invi.addItem(i);
 									}
 								} else {
-									((ItemType) obj).addTo(invi);
+									((ItemType) d).addTo(invi);
 								}
 							}
 						} else {
-							for (Object obj : delta) {
-								if (obj instanceof Inventory) {
-									invi.removeItem(((Inventory) obj).getContents());
+							for (final Object d : delta) {
+								if (d instanceof Inventory) {
+									invi.removeItem(((Inventory) d).getContents());
 								} else {
 									if (mode == ChangeMode.REMOVE)
-										((ItemType) obj).removeFrom(invi);
+										((ItemType) d).removeFrom(invi);
 									else
-										((ItemType) obj).removeAll(invi);
+										((ItemType) d).removeAll(invi);
 								}
 							}
 						}

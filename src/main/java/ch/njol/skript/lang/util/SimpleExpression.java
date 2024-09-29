@@ -18,11 +18,18 @@
  */
 package ch.njol.skript.lang.util;
 
+import java.lang.reflect.Array;
+import java.util.Iterator;
+
+import org.bukkit.event.Event;
+import org.eclipse.jdt.annotation.Nullable;
+
 import ch.njol.skript.Skript;
 import ch.njol.skript.SkriptAPIException;
 import ch.njol.skript.classes.Changer;
 import ch.njol.skript.classes.Changer.ChangeMode;
 import ch.njol.skript.classes.ClassInfo;
+import ch.njol.skript.classes.Converter;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.ExpressionType;
 import ch.njol.skript.registrations.Classes;
@@ -31,138 +38,136 @@ import ch.njol.util.Checker;
 import ch.njol.util.Kleenean;
 import ch.njol.util.coll.CollectionUtils;
 import ch.njol.util.coll.iterator.ArrayIterator;
-import org.bukkit.event.Event;
-import org.eclipse.jdt.annotation.NonNull;
-import org.eclipse.jdt.annotation.Nullable;
-import org.skriptlang.skript.lang.converter.Converter;
-import org.skriptlang.skript.lang.converter.ConverterInfo;
-
-import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
 
 /**
  * An implementation of the {@link Expression} interface. You should usually extend this class to make a new expression.
  * 
  * @see Skript#registerExpression(Class, Class, ExpressionType, String...)
+ * @author Peter Güttinger
  */
 public abstract class SimpleExpression<T> implements Expression<T> {
-
+	
 	private int time = 0;
-
+	
 	protected SimpleExpression() {}
-
+	
 	@Override
 	@Nullable
-	public final T getSingle(Event event) {
-		T[] values = getArray(event);
-		if (values.length == 0)
+	public final T getSingle(final Event e) {
+		final T[] all = getArray(e);
+		if (all.length == 0)
 			return null;
-		if (values.length > 1)
+		if (all.length > 1)
 			throw new SkriptAPIException("Call to getSingle() on a non-single expression");
-		return values[0];
+		return all[0];
 	}
-
-	@Override
+	
+	/**
+	 * {@inheritDoc}
+	 * <p>
+	 * Unlike {@link #get(Event)} you have to make sure that the this method's returned array is neither null nor contains null elements.
+	 */
 	@SuppressWarnings("unchecked")
-	public T[] getAll(Event event) {
-		T[] values = get(event);
-		if (values == null) {
-			T[] emptyArray = (T[]) Array.newInstance(getReturnType(), 0);
-			assert emptyArray != null;
-			return emptyArray;
+	@Override
+	public T[] getAll(final Event e) {
+		final T[] all = get(e);
+		if (all == null) {
+			final T[] r = (T[]) Array.newInstance(getReturnType(), 0);
+			assert r != null;
+			return r;
 		}
-		if (values.length == 0)
-			return values;
+		if (all.length == 0)
+			return all;
 		int numNonNull = 0;
-		for (T value : values)
-			if (value != null)
+		for (final T t : all)
+			if (t != null)
 				numNonNull++;
-		if (numNonNull == values.length)
-			return Arrays.copyOf(values, values.length);
-		T[] valueArray = (T[]) Array.newInstance(getReturnType(), numNonNull);
-		assert valueArray != null;
+		if (numNonNull == all.length)
+			return all;
+		final T[] r = (T[]) Array.newInstance(getReturnType(), numNonNull);
+		assert r != null;
 		int i = 0;
-		for (T value : values)
-			if (value != null)
-				valueArray[i++] = value;
-		return valueArray;
+		for (final T t : all)
+			if (t != null)
+				r[i++] = t;
+		return r;
 	}
-
-	@Override
+	
 	@SuppressWarnings("unchecked")
-	public final T[] getArray(Event event) {
-		T[] values = get(event);
-		if (values == null) {
-			return (T[]) Array.newInstance(getReturnType(), 0);
+	@Override
+	public final T[] getArray(final Event e) {
+		final T[] all = get(e);
+		if (all == null) {
+			final T[] r = (T[]) Array.newInstance(getReturnType(), 0);
+			assert r != null;
+			return r;
 		}
-		if (values.length == 0)
-			return values;
-
+		if (all.length == 0)
+			return all;
+		
 		int numNonNull = 0;
-		for (T value : values)
-			if (value != null)
+		for (final T t : all)
+			if (t != null)
 				numNonNull++;
-
+		
 		if (!getAnd()) {
-			if (values.length == 1 && values[0] != null)
-				return Arrays.copyOf(values, 1);
+			if (all.length == 1 && all[0] != null)
+				return all;
 			int rand = Utils.random(0, numNonNull);
-			T[] valueArray = (T[]) Array.newInstance(getReturnType(), 1);
-			for (T value : values) {
-				if (value != null) {
+			final T[] one = (T[]) Array.newInstance(getReturnType(), 1);
+			for (final T t : all) {
+				if (t != null) {
 					if (rand == 0) {
-						valueArray[0] = value;
-						return valueArray;
+						one[0] = t;
+						return one;
 					}
 					rand--;
 				}
 			}
 			assert false;
 		}
-
-		if (numNonNull == values.length)
-			return Arrays.copyOf(values, values.length);
-		T[] valueArray = (T[]) Array.newInstance(getReturnType(), numNonNull);
+		
+		if (numNonNull == all.length)
+			return all;
+		final T[] r = (T[]) Array.newInstance(getReturnType(), numNonNull);
+		assert r != null;
 		int i = 0;
-		for (T value : values)
-			if (value != null)
-				valueArray[i++] = value;
-		return valueArray;
+		for (final T t : all)
+			if (t != null)
+				r[i++] = t;
+		return r;
 	}
-
+	
 	/**
 	 * This is the internal method to get an expression's values.<br>
 	 * To get the expression's value from the outside use {@link #getSingle(Event)} or {@link #getArray(Event)}.
 	 * 
-	 * @param event The event with which this expression is evaluated.
+	 * @param e The event
 	 * @return An array of values for this event. May not contain nulls.
 	 */
 	@Nullable
-	protected abstract T[] get(Event event);
-
+	protected abstract T[] get(Event e);
+	
 	@Override
-	public final boolean check(Event event, Checker<? super T> checker) {
-		return check(event, checker, false);
+	public final boolean check(final Event e, final Checker<? super T> c) {
+		return check(e, c, false);
 	}
-
+	
 	@Override
-	public final boolean check(Event event, Checker<? super T> checker, boolean negated) {
-		return check(get(event), checker, negated, getAnd());
+	public final boolean check(final Event e, final Checker<? super T> c, final boolean negated) {
+		return check(get(e), c, negated, getAnd());
 	}
-
-	// TODO return a kleenean (UNKNOWN if 'values' is null or empty)
-	public static <T> boolean check(@Nullable T[] values, Checker<? super T> checker, boolean invert, boolean and) {
-		if (values == null)
+	
+	// TODO return a kleenean (UNKNOWN if 'all' is null or empty)
+	public static <T> boolean check(final @Nullable T[] all, final Checker<? super T> c, final boolean invert, final boolean and) {
+		if (all == null)
 			return invert;
 		boolean hasElement = false;
-		for (T value : values) {
-			if (value == null)
+		for (final T t : all) {
+			if (t == null)
 				continue;
 			hasElement = true;
-			boolean b = checker.check(value);
+			final boolean b = c.check(t);
 			if (and && !b)
 				return invert;
 			if (!and && b)
@@ -172,7 +177,7 @@ public abstract class SimpleExpression<T> implements Expression<T> {
 			return invert;
 		return invert ^ and;
 	}
-
+	
 	/**
 	 * Converts this expression to another type. Unless the expression is special, the default implementation is sufficient.
 	 * <p>
@@ -185,7 +190,7 @@ public abstract class SimpleExpression<T> implements Expression<T> {
 	 * @see Converter
 	 */
 	@Nullable
-	protected <R> ConvertedExpression<T, ? extends R> getConvertedExpr(Class<R>... to) {
+	protected <R> ConvertedExpression<T, ? extends R> getConvertedExpr(final Class<R>... to) {
 		assert !CollectionUtils.containsSuperclass(to, getReturnType());
 		return ConvertedExpression.newInstance(this, to);
 	}
@@ -200,69 +205,41 @@ public abstract class SimpleExpression<T> implements Expression<T> {
 	 * @return The converted expression
 	 */
 	@Override
-	@Nullable
 	@SuppressWarnings("unchecked")
-	public <R> Expression<? extends R> getConvertedExpression(Class<R>... to) {
-		// check whether this expression is already of type R
+	@Nullable
+	public <R> Expression<? extends R> getConvertedExpression(final Class<R>... to) {
 		if (CollectionUtils.containsSuperclass(to, getReturnType()))
 			return (Expression<? extends R>) this;
-
-		// we might be to cast some of the possible return types to R
-		List<ConverterInfo<? extends T, R>> infos = new ArrayList<>();
-		for (Class<? extends T> type : this.possibleReturnTypes()) {
-			if (CollectionUtils.containsSuperclass(to, type)) { // this type is of R
-				// build a converter that for casting to R
-				// safety check is present in the event that we do not get this type at runtime
-				final Class<R> toType = (Class<R>) type;
-				infos.add(new ConverterInfo<>(getReturnType(), toType, fromObject -> {
-					if (toType.isInstance(fromObject))
-						return (R) fromObject;
-					return null;
-				}, 0));
-			}
-		}
-		int size = infos.size();
-		if (size == 1) { // if there is only one info, there is no need to wrap it in a list
-			ConverterInfo<? extends T, R> info = infos.get(0);
-			//noinspection rawtypes
-			return new ConvertedExpression(this, info.getTo(), info);
-		}
-		if (size > 1) {
-			//noinspection rawtypes
-			return new ConvertedExpression(this, Utils.getSuperType(infos.stream().map(ConverterInfo::getTo).toArray(Class[]::new)), infos, false);
-		}
-
-		// attempt traditional conversion with proper converters
 		return this.getConvertedExpr(to);
 	}
-
+	
 	@Nullable
 	private ClassInfo<?> returnTypeInfo;
-
+	
 	@Override
 	@Nullable
-	public Class<?>[] acceptChange(ChangeMode mode) {
-		ClassInfo<?> returnTypeInfo = this.returnTypeInfo;
-		if (returnTypeInfo == null)
-			this.returnTypeInfo = returnTypeInfo = Classes.getSuperClassInfo(getReturnType());
-		Changer<?> changer = returnTypeInfo.getChanger();
-		if (changer == null)
+	public Class<?>[] acceptChange(final ChangeMode mode) {
+		ClassInfo<?> rti = returnTypeInfo;
+		if (rti == null)
+			returnTypeInfo = rti = Classes.getSuperClassInfo(getReturnType());
+		final Changer<?> c = rti.getChanger();
+		if (c == null)
 			return null;
-		return changer.acceptChange(mode);
+		return c.acceptChange(mode);
 	}
-
-	@Override
+	
 	@SuppressWarnings("unchecked")
-	public void change(Event event, @Nullable Object[] delta, ChangeMode mode) {
-		ClassInfo<?> returnTypeInfo = this.returnTypeInfo;
-		if (returnTypeInfo == null)
+	@Override
+	public void change(final Event e, final @Nullable Object[] delta, final ChangeMode mode) {
+		final ClassInfo<?> rti = returnTypeInfo;
+		if (rti == null)
 			throw new UnsupportedOperationException();
-		Changer<?> changer = returnTypeInfo.getChanger();
-		if (changer == null)
+		final Changer<?> c = rti.getChanger();
+		if (c == null)
 			throw new UnsupportedOperationException();
-		((Changer<T>) changer).change(getArray(event), delta, mode);
+		((Changer<T>) c).change(getArray(e), delta, mode);
 	}
-
+	
 	/**
 	 * {@inheritDoc}
 	 * <p>
@@ -272,18 +249,18 @@ public abstract class SimpleExpression<T> implements Expression<T> {
 	 * @see #setTime(int, Expression, Class...)
 	 */
 	@Override
-	public boolean setTime(int time) {
+	public boolean setTime(final int time) {
 		if (getParser().getHasDelayBefore() == Kleenean.TRUE && time != 0) {
-			Skript.error("Can't use time states after the event has already passed.");
+			Skript.error("Can't use time states after the event has already passed");
 			return false;
 		}
 		this.time = time;
 		return false;
 	}
-
-	protected final boolean setTime(int time, Class<? extends Event> applicableEvent) {
+	
+	protected final boolean setTime(final int time, final Class<? extends Event> applicableEvent) {
 		if (getParser().getHasDelayBefore() == Kleenean.TRUE && time != 0) {
-			Skript.error("Can't use time states after the event has already passed.");
+			Skript.error("Can't use time states after the event has already passed");
 			return false;
 		}
 		if (!getParser().isCurrentEvent(applicableEvent))
@@ -291,27 +268,15 @@ public abstract class SimpleExpression<T> implements Expression<T> {
 		this.time = time;
 		return true;
 	}
-
-	@SafeVarargs
-	protected final boolean setTime(int time, Class<? extends Event>... applicableEvents) {
+	
+	protected final boolean setTime(final int time, final Class<? extends Event> applicableEvent, final Expression<?>... mustbeDefaultVars) {
 		if (getParser().getHasDelayBefore() == Kleenean.TRUE && time != 0) {
-			Skript.error("Can't use time states after the event has already passed.");
-			return false;
-		}
-		if (!getParser().isCurrentEvent(applicableEvents))
-			return false;
-		this.time = time;
-		return true;
-	}
-
-	protected final boolean setTime(int time, Class<? extends Event> applicableEvent, @NonNull Expression<?>... mustbeDefaultVars) {
-		if (getParser().getHasDelayBefore() == Kleenean.TRUE && time != 0) {
-			Skript.error("Can't use time states after the event has already passed.");
+			Skript.error("Can't use time states after the event has already passed");
 			return false;
 		}
 		if (!getParser().isCurrentEvent(applicableEvent))
 			return false;
-		for (Expression<?> var : mustbeDefaultVars) {
+		for (final Expression<?> var : mustbeDefaultVars) {
 			if (!var.isDefault()) {
 				return false;
 			}
@@ -319,16 +284,10 @@ public abstract class SimpleExpression<T> implements Expression<T> {
 		this.time = time;
 		return true;
 	}
-
-	@SafeVarargs
-	protected final boolean setTime(int time, Expression<?> mustbeDefaultVar, Class<? extends Event>... applicableEvents) {
+	
+	protected final boolean setTime(final int time, final Expression<?> mustbeDefaultVar, final Class<? extends Event>... applicableEvents) {
 		if (getParser().getHasDelayBefore() == Kleenean.TRUE && time != 0) {
-			Skript.error("Can't use time states after the event has already passed.");
-			return false;
-		}
-		if (mustbeDefaultVar == null) {
-			Skript.exception(new SkriptAPIException("Default expression was null. If the default expression can be null, don't be using" +
-					" 'SimpleExpression#setTime(int, Expression<?>, Class<? extends Event>...)' instead use the setTime without an expression if null."));
+			Skript.error("Can't use time states after the event has already passed");
 			return false;
 		}
 		if (!mustbeDefaultVar.isDefault())
@@ -339,43 +298,43 @@ public abstract class SimpleExpression<T> implements Expression<T> {
 		}
 		return false;
 	}
-
+	
 	@Override
 	public int getTime() {
 		return time;
 	}
-
+	
 	@Override
 	public boolean isDefault() {
 		return false;
 	}
-
+	
 	@Override
-	public boolean isLoopOf(String input) {
+	public boolean isLoopOf(final String s) {
 		return false;
 	}
-
+	
 	@Override
 	@Nullable
-	public Iterator<? extends T> iterator(Event event) {
-		return new ArrayIterator<>(getArray(event));
+	public Iterator<? extends T> iterator(final Event e) {
+		return new ArrayIterator<>(getArray(e));
 	}
-
+	
 	@Override
 	public String toString() {
 		return toString(null, false);
 	}
-
+	
 	@Override
 	public Expression<?> getSource() {
 		return this;
 	}
-
+	
 	@Override
 	public Expression<? extends T> simplify() {
 		return this;
 	}
-
+	
 	@Override
 	public boolean getAnd() {
 		return true;

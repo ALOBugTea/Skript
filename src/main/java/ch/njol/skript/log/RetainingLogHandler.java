@@ -25,6 +25,7 @@ import java.util.Deque;
 import java.util.LinkedList;
 import java.util.logging.Level;
 
+import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.eclipse.jdt.annotation.Nullable;
 
@@ -178,8 +179,6 @@ public class RetainingLogHandler extends LogHandler {
 	
 	@SuppressWarnings("null")
 	public Collection<LogEntry> getLog() {
-		// if something is grabbing the log entries, they're probably handling them manually
-		printedErrorOrLog = true;
 		return Collections.unmodifiableCollection(log);
 	}
 	

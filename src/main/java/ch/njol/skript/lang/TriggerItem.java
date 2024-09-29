@@ -18,14 +18,14 @@
  */
 package ch.njol.skript.lang;
 
-import ch.njol.skript.Skript;
+import java.io.File;
+
 import ch.njol.skript.util.SkriptColor;
-import ch.njol.util.StringUtils;
 import org.bukkit.event.Event;
 import org.eclipse.jdt.annotation.Nullable;
-import org.skriptlang.skript.lang.script.Script;
 
-import java.io.File;
+import ch.njol.skript.Skript;
+import ch.njol.util.StringUtils;
 
 /**
  * Represents a trigger item, i.e. a trigger section, a condition or an effect.
@@ -36,142 +36,134 @@ import java.io.File;
  * @see Statement
  */
 public abstract class TriggerItem implements Debuggable {
-
+	
 	@Nullable
 	protected TriggerSection parent = null;
 	@Nullable
 	private TriggerItem next = null;
-
+	
 	protected TriggerItem() {}
-
-	protected TriggerItem(TriggerSection parent) {
+	
+	protected TriggerItem(final TriggerSection parent) {
 		this.parent = parent;
 	}
-
+	
 	/**
 	 * Executes this item and returns the next item to run.
 	 * <p>
 	 * Overriding classes must call {@link #debug(Event, boolean)}. If this method is overridden, {@link #run(Event)} is not used anymore and can be ignored.
 	 * 
-	 * @param event The event
+	 * @param e
 	 * @return The next item to run or null to stop execution
 	 */
 	@Nullable
-	protected TriggerItem walk(Event event) {
-		if (run(event)) {
-			debug(event, true);
+	protected TriggerItem walk(final Event e) {
+		if (run(e)) {
+			debug(e, true);
 			return next;
 		} else {
-			debug(event, false);
-			TriggerSection parent = this.parent;
+			debug(e, false);
+			final TriggerSection parent = this.parent;
 			return parent == null ? null : parent.getNext();
 		}
 	}
-
+	
 	/**
 	 * Executes this item.
 	 * 
-	 * @param event The event to run this item with
+	 * @param e
 	 * @return True if the next item should be run, or false for the item following this item's parent.
 	 */
-	protected abstract boolean run(Event event);
-
+	protected abstract boolean run(Event e);
+	
 	/**
-	 * @param start The item to start at
-	 * @param event The event to run the items with
+	 * @param start
+	 * @param e
 	 * @return false if an exception occurred
 	 */
-	public static boolean walk(TriggerItem start, Event event) {
-		TriggerItem triggerItem = start;
+	public static boolean walk(final TriggerItem start, final Event e) {
+		assert start != null && e != null;
+		TriggerItem i = start;
 		try {
-			while (triggerItem != null)
-				triggerItem = triggerItem.walk(event);
-
+			while (i != null)
+				i = i.walk(e);
+			
 			return true;
-		} catch (StackOverflowError err) {
-			Trigger trigger = start.getTrigger();
-			String scriptName = "<unknown>";
-			if (trigger != null) {
-				Script script = trigger.getScript();
-				if (script != null) {
-					File scriptFile = script.getConfig().getFile();
-					if (scriptFile != null)
-						scriptName = scriptFile.getName();
-				}
-			}
-			Skript.adminBroadcast("<red>The script '<gold>" + scriptName + "<red>' infinitely (or excessively) repeated itself!");
+		} catch (final StackOverflowError err) {
+			final Trigger t = start.getTrigger();
+			final File sc = t == null ? null : t.getScript();
+			Skript.adminBroadcast("<red>The script '<gold>" + (sc == null ? "<unknown>" : sc.getName()) + "<red>' infinitely (or excessively) repeated itself!");
 			if (Skript.debug())
 				err.printStackTrace();
-		} catch (Exception ex) {
+		} catch (final Exception ex) {
 			if (ex.getStackTrace().length != 0) // empty exceptions have already been printed
-				Skript.exception(ex, triggerItem);
-		} catch (Throwable throwable) {
-			// not all Throwables are Exceptions, but we usually don't want to catch them (without rethrowing)
-			Skript.markErrored();
-			throw throwable;
+				Skript.exception(ex, i);
 		}
 		return false;
 	}
-
+	
 	/**
 	 * how much to indent each level
 	 */
-	private final static String INDENT = "  ";
-
+	private final static String indent = "  ";
+	
 	@Nullable
 	private String indentation = null;
-
+	
 	public String getIndentation() {
-		if (indentation == null) {
+		String ind = indentation;
+		if (ind == null) {
 			int level = 0;
-			TriggerItem triggerItem = this;
-			while ((triggerItem = triggerItem.parent) != null)
+			TriggerItem i = this;
+			while ((i = i.parent) != null)
 				level++;
-			indentation = StringUtils.multiply(INDENT, level);
+			indentation = ind = StringUtils.multiply(indent, level);
 		}
-		return indentation;
+		return ind;
 	}
-
-	protected final void debug(Event event, boolean run) {
+	
+	protected final void debug(final Event e, final boolean run) {
 		if (!Skript.debug())
 			return;
-		Skript.debug(SkriptColor.replaceColorChar(getIndentation() + (run ? "" : "-") + toString(event, true)));
+		Skript.debug(SkriptColor.replaceColorChar(getIndentation() + (run ? "" : "-") + toString(e, true)));
 	}
-
+	
 	@Override
 	public final String toString() {
 		return toString(null, false);
 	}
-
-	public TriggerItem setParent(@Nullable TriggerSection parent) {
+	
+	public TriggerItem setParent(final @Nullable TriggerSection parent) {
 		this.parent = parent;
 		return this;
 	}
-
+	
 	@Nullable
 	public final TriggerSection getParent() {
 		return parent;
 	}
-
+	
 	/**
 	 * @return The trigger this item belongs to, or null if this is a stand-alone item (e.g. the effect of an effect command)
 	 */
 	@Nullable
 	public final Trigger getTrigger() {
-		TriggerItem triggerItem = this;
-		while (triggerItem != null && !(triggerItem instanceof Trigger))
-			triggerItem = triggerItem.getParent();
-		return (Trigger) triggerItem;
+		TriggerItem i = this;
+		while (i != null && !(i instanceof Trigger))
+			i = i.getParent();
+//		if (i == null)
+//			throw new IllegalStateException("TriggerItem without a Trigger detected!");
+		return (Trigger) i;
 	}
-
-	public TriggerItem setNext(@Nullable TriggerItem next) {
+	
+	public TriggerItem setNext(final @Nullable TriggerItem next) {
 		this.next = next;
 		return this;
 	}
-
+	
 	@Nullable
 	public TriggerItem getNext() {
 		return next;
 	}
-
+	
 }

@@ -20,7 +20,6 @@ package ch.njol.util;
 
 import java.io.Serializable;
 import java.util.Map.Entry;
-import java.util.Objects;
 
 import org.eclipse.jdt.annotation.Nullable;
 
@@ -97,7 +96,9 @@ public class Pair<T1, T2> implements Entry<T1, T2>, Cloneable, Serializable {
 	 */
 	@Override
 	public final int hashCode() {
-		return Objects.hash(first, second);
+		final T1 first = this.first;
+		final T2 second = this.second;
+		return (first == null ? 0 : first.hashCode()) ^ (second == null ? 0 : second.hashCode());
 	}
 	
 	@Override

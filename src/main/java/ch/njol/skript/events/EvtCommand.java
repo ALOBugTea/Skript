@@ -44,9 +44,9 @@ public class EvtCommand extends SkriptEvent { // TODO condition to check whether
 	
 	@Nullable
 	private String command = null;
-
-	@Override
+	
 	@SuppressWarnings("null")
+	@Override
 	public boolean init(final Literal<?>[] args, final int matchedPattern, final ParseResult parser) {
 		if (args[0] != null) {
 			command = ((Literal<String>) args[0]).getSingle();
@@ -55,13 +55,10 @@ public class EvtCommand extends SkriptEvent { // TODO condition to check whether
 		}
 		return true;
 	}
-
-	@Override
+	
 	@SuppressWarnings("null")
+	@Override
 	public boolean check(final Event e) {
-		if (e instanceof ServerCommandEvent && ((ServerCommandEvent) e).getCommand().isEmpty())
-			return false;
-
 		if (command == null)
 			return true;
 		final String message;

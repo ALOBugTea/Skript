@@ -18,6 +18,7 @@
  */
 package ch.njol.skript;
 
+import ch.njol.skript.classes.data.BukkitClasses;
 import ch.njol.skript.config.Config;
 import ch.njol.skript.config.EnumParser;
 import ch.njol.skript.config.Option;
@@ -37,13 +38,11 @@ import ch.njol.skript.timings.SkriptTimings;
 import ch.njol.skript.update.ReleaseChannel;
 import ch.njol.skript.util.FileUtils;
 import ch.njol.skript.util.Timespan;
-import ch.njol.skript.util.Version;
 import ch.njol.skript.util.chat.ChatMessages;
 import ch.njol.skript.util.chat.LinkParseMode;
 import ch.njol.skript.variables.Variables;
-import co.aikar.timings.Timings;
 import org.bukkit.event.EventPriority;
-import org.jetbrains.annotations.Nullable;
+import org.eclipse.jdt.annotation.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -79,33 +78,32 @@ public class SkriptConfig {
 				}
 			});
 	
-	public static final Option<Boolean> checkForNewVersion = new Option<>("check for new version", false)
+	static final Option<Boolean> checkForNewVersion = new Option<>("check for new version", false)
 			.setter(t -> {
 				SkriptUpdater updater = Skript.getInstance().getUpdater();
 				if (updater != null)
 					updater.setEnabled(t);
 			});
-	public static final Option<Timespan> updateCheckInterval = new Option<>("update check interval", new Timespan(12 * 60 * 60 * 1000))
+	static final Option<Timespan> updateCheckInterval = new Option<>("update check interval", new Timespan(12 * 60 * 60 * 1000))
 			.setter(t -> {
 				SkriptUpdater updater = Skript.getInstance().getUpdater();
 				if (updater != null)
-					updater.setCheckFrequency(t.getTicks());
+					updater.setCheckFrequency(t.getTicks_i());
 			});
 	static final Option<Integer> updaterDownloadTries = new Option<>("updater download tries", 7)
 			.optional(true);
-	public static final Option<String> releaseChannel = new Option<>("release channel", "none")
+	static final Option<String> releaseChannel = new Option<>("release channel", "none")
 			.setter(t -> {
 				ReleaseChannel channel;
 				switch (t) {
-					case "alpha":
-					case "beta":
-						Skript.warning("'alpha' and 'beta' are no longer valid release channels. Use 'prerelease' instead.");
-					case "prerelease": // All development builds are valid
+					case "alpha":  // Everything goes in alpha channel
 						channel = new ReleaseChannel((name) -> true, t);
 						break;
+					case "beta":
+						channel = new ReleaseChannel((name) -> !name.contains("alpha"), t);
+						break;
 					case "stable":
-						// TODO a better option would be to check that it is not a pre-release through GH API
-						channel = new ReleaseChannel((name) -> !(name.contains("-")), t);
+						channel = new ReleaseChannel((name) -> !name.contains("alpha") && !name.contains("beta"), t);
 						break;
 					case "none":
 						channel = new ReleaseChannel((name) -> false, t);
@@ -117,6 +115,9 @@ public class SkriptConfig {
 				}
 				SkriptUpdater updater = Skript.getInstance().getUpdater();
 				if (updater != null) {
+					if (updater.getCurrentRelease().flavor.contains("spigot") && !t.equals("stable")) {
+						Skript.error("Only stable Skript versions are uploaded to Spigot resources.");
+					}
 					updater.setReleaseChannel(channel);
 				}
 			});
@@ -124,14 +125,7 @@ public class SkriptConfig {
 	public static final Option<Boolean> enableEffectCommands = new Option<>("enable effect commands", false);
 	public static final Option<String> effectCommandToken = new Option<>("effect command token", "!");
 	public static final Option<Boolean> allowOpsToUseEffectCommands = new Option<>("allow ops to use effect commands", false);
-
-	/*
-	 * @deprecated Will be removed in 2.8.0. Use {@link #logEffectCommands} instead.
-	 */
-	@Deprecated
-	public static final Option<Boolean> logPlayerCommands = new Option<>("log player commands", false).optional(true);
-	public static final Option<Boolean> logEffectCommands = new Option<>("log effect commands", false);
-
+	
 	// everything handled by Variables
 	public static final OptionSection databases = new OptionSection("databases");
 	
@@ -140,7 +134,7 @@ public class SkriptConfig {
 	
 	@SuppressWarnings("null")
 	private static final DateFormat shortDateFormat = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT);
-	public static final Option<DateFormat> dateFormat = new Option<>("date format", shortDateFormat, s -> {
+	private static final Option<DateFormat> dateFormat = new Option<>("date format", shortDateFormat, s -> {
 		try {
 			if (s.equalsIgnoreCase("default"))
 				return null;
@@ -158,7 +152,7 @@ public class SkriptConfig {
 		}
 	}
 	
-	public static final Option<Verbosity> verbosity = new Option<>("verbosity", Verbosity.NORMAL, new EnumParser<>(Verbosity.class, "verbosity"))
+	static final Option<Verbosity> verbosity = new Option<>("verbosity", Verbosity.NORMAL, new EnumParser<>(Verbosity.class, "verbosity"))
 			.setter(SkriptLogger::setVerbosity);
 	
 	public static final Option<EventPriority> defaultEventPriority = new Option<>("plugin priority", EventPriority.NORMAL, s -> {
@@ -169,13 +163,8 @@ public class SkriptConfig {
 			return null;
 		}
 	});
-
-	/**
-	 * Determines whether `on &lt;event&gt;` will be triggered by cancelled events or not.
-	 */
-	public static final Option<Boolean> listenCancelledByDefault = new Option<>("listen to cancelled events by default", false)
-			.optional(true);
-
+  
+	public static final Option<Boolean> logPlayerCommands = new Option<Boolean>("log player commands", false);
 	
 	/**
 	 * Maximum number of digits to display after the period for floats and doubles
@@ -207,22 +196,15 @@ public class SkriptConfig {
 	
 	public static final Option<Boolean> enableTimings = new Option<>("enable timings", false)
 			.setter(t -> {
-				if (!Skript.classExists("co.aikar.timings.Timings")) { // Check for Timings
+				if (Skript.classExists("co.aikar.timings.Timings")) { // Check for Paper server
+					if (t)
+						Skript.info("Timings support enabled!");
+					SkriptTimings.setEnabled(t); // Config option will be used
+				} else { // Not running Paper
 					if (t) // Warn the server admin that timings won't work
 						Skript.warning("Timings cannot be enabled! You are running Bukkit/Spigot, but Paper is required.");
 					SkriptTimings.setEnabled(false); // Just to be sure, deactivate timings support completely
-					return;
 				}
-				if (Timings.class.isAnnotationPresent(Deprecated.class)) { // check for deprecated Timings
-					if (t) // Warn the server admin that timings won't work
-						Skript.warning("Timings cannot be enabled! Paper no longer supports Timings as of 1.19.4.");
-					SkriptTimings.setEnabled(false); // Just to be sure, deactivate timings support completely
-					return;
-				}
-				// If we get here, we can safely enable timings
-				if (t)
-					Skript.info("Timings support enabled!");
-				SkriptTimings.setEnabled(t); // Config option will be used
 			});
 	
 	public static final Option<String> parseLinks = new Option<>("parse links in chat messages", "disabled")
@@ -250,10 +232,8 @@ public class SkriptConfig {
 			});
 
 	public static final Option<Boolean> caseInsensitiveVariables = new Option<>("case-insensitive variables", true)
-			.setter(t -> Variables.caseInsensitiveVariables = t);
-
-	public static final Option<Boolean> caseInsensitiveCommands = new Option<>("case-insensitive commands", false)
-		.optional(true);
+			.setter(t -> Variables.caseInsensitiveVariables = t)
+			.optional(true);
 	
 	public static final Option<Boolean> colorResetCodes = new Option<>("color codes reset formatting", true)
 			.setter(t -> {
@@ -344,8 +324,6 @@ public class SkriptConfig {
 		}
 	}).optional(true);
 
-	public static final Option<Timespan> longParseTimeWarningThreshold = new Option<>("long parse time warning threshold", new Timespan(0));
-
 	/**
 	 * This should only be used in special cases
 	 */
@@ -384,9 +362,8 @@ public class SkriptConfig {
 				return false;
 			}
 			mainConfig = mc;
-
-			String configVersion = mc.get(version.key);
-			if (configVersion == null || Skript.getVersion().compareTo(new Version(configVersion)) != 0) {
+			
+			if (!Skript.getVersion().toString().equals(mc.get(version.key))) {
 				try {
 					final InputStream in = Skript.getInstance().getResource("config.sk");
 					if (in == null) {

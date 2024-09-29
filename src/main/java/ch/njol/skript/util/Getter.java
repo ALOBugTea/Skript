@@ -18,8 +18,9 @@
  */
 package ch.njol.skript.util;
 
-import ch.njol.skript.classes.Converter;
 import org.eclipse.jdt.annotation.Nullable;
+
+import ch.njol.skript.classes.Converter;
 
 /**
  * Used to get a specific value from instances of some type.
@@ -28,7 +29,6 @@ import org.eclipse.jdt.annotation.Nullable;
  * @param <A> the type which holds the value
  * @author Peter Güttinger
  */
-@SuppressWarnings("deprecation") // for backwards compatibility
 public abstract class Getter<R, A> implements Converter<A, R> {
 	
 	/**

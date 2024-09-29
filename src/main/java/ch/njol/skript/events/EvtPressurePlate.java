@@ -19,7 +19,6 @@
 package ch.njol.skript.events;
 
 import org.bukkit.Material;
-import org.bukkit.Tag;
 import org.bukkit.block.Block;
 import org.bukkit.event.Event;
 import org.bukkit.event.block.Action;
@@ -37,9 +36,6 @@ import ch.njol.skript.lang.SkriptParser.ParseResult;
  * @author Peter Güttinger
  */
 public class EvtPressurePlate extends SkriptEvent {
-
-	private static final boolean HAS_PRESSURE_PLATE_TAG = Skript.fieldExists(Tag.class, "PRESSURE_PLATES");
-
 	static {
 		// TODO is EntityInteractEvent similar for entities?
 		Skript.registerEvent("Pressure Plate / Trip", EvtPressurePlate.class, PlayerInteractEvent.class,
@@ -49,7 +45,9 @@ public class EvtPressurePlate extends SkriptEvent {
 				.examples("on step on pressure plate:")
 				.since("1.0 (pressure plate), 1.4.4 (tripwire)");
 	}
-
+	
+	private static final ItemType plate = Aliases.javaItemType("pressure plate");
+	
 	private boolean tripwire;
 	
 	@Override
@@ -57,25 +55,14 @@ public class EvtPressurePlate extends SkriptEvent {
 		tripwire = matchedPattern == 1;
 		return true;
 	}
-
+	
 	@Override
-	public boolean check(Event event) {
-		Block clickedBlock = ((PlayerInteractEvent) event).getClickedBlock();
-		Material type = clickedBlock == null ? null : clickedBlock.getType();
-		if (type == null || ((PlayerInteractEvent) event).getAction() != Action.PHYSICAL )
-			return false;
-
-		if (tripwire)
-			return(type == Material.TRIPWIRE || type == Material.TRIPWIRE_HOOK);
-
-		// TODO: 1.16+, remove check in 2.10
-		if (HAS_PRESSURE_PLATE_TAG)
-			return Tag.PRESSURE_PLATES.isTagged(type);
-
-		return Tag.WOODEN_PRESSURE_PLATES.isTagged(type)
-			|| type == Material.HEAVY_WEIGHTED_PRESSURE_PLATE
-			|| type == Material.LIGHT_WEIGHTED_PRESSURE_PLATE
-			|| type == Material.STONE_PRESSURE_PLATE;
+	public boolean check(final Event e) {
+		final Block b = ((PlayerInteractEvent) e).getClickedBlock();
+		final Material type = b == null ? null : b.getType();
+		return type != null && ((PlayerInteractEvent) e).getAction() == Action.PHYSICAL &&
+				(tripwire ? (type == Material.TRIPWIRE || type == Material.TRIPWIRE_HOOK)
+						: plate.isOfType(type));
 	}
 	
 	@Override

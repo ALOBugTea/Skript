@@ -18,109 +18,132 @@
  */
 package ch.njol.skript.events;
 
-import ch.njol.skript.Skript;
-import ch.njol.skript.SkriptEventHandler;
-import ch.njol.skript.events.bukkit.ScheduledEvent;
-import ch.njol.skript.events.bukkit.ScheduledNoWorldEvent;
-import ch.njol.skript.lang.Literal;
-import ch.njol.skript.lang.SkriptEvent;
-import ch.njol.skript.lang.SkriptParser.ParseResult;
-import ch.njol.skript.util.Timespan;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.event.Event;
 import org.eclipse.jdt.annotation.Nullable;
 
-public class EvtPeriodical extends SkriptEvent {
+import ch.njol.skript.Skript;
+import ch.njol.skript.SkriptEventHandler;
+import ch.njol.skript.events.bukkit.ScheduledEvent;
+import ch.njol.skript.events.bukkit.ScheduledNoWorldEvent;
+import ch.njol.skript.lang.Literal;
+import ch.njol.skript.lang.SelfRegisteringSkriptEvent;
+import ch.njol.skript.lang.SkriptParser.ParseResult;
+import ch.njol.skript.lang.Trigger;
+import ch.njol.skript.util.Timespan;
 
+/**
+ * @author Peter Güttinger
+ */
+public class EvtPeriodical extends SelfRegisteringSkriptEvent {
 	static {
 		Skript.registerEvent("*Periodical", EvtPeriodical.class, ScheduledNoWorldEvent.class, "every %timespan%")
 				.description("An event that is called periodically.")
-				.examples(
-					"every 2 seconds:",
-					"every minecraft hour:",
-					"every tick: # can cause lag depending on the code inside the event",
-					"every minecraft days:"
-				).since("1.0");
+				.examples("every 2 seconds:",
+						"every minecraft hour:",
+						"every tick: # can cause lag depending on the code inside the event",
+						"every minecraft days:")
+				.since("1.0");
 		Skript.registerEvent("*Periodical", EvtPeriodical.class, ScheduledEvent.class, "every %timespan% in [world[s]] %worlds%")
 				.description("An event that is called periodically.")
-				.examples(
-					"every 2 seconds in \"world\":",
-					"every minecraft hour in \"flatworld\":",
-					"every tick in \"world\": # can cause lag depending on the code inside the event",
-					"every minecraft days in \"plots\":"
-				).since("1.0")
+				.examples("every 2 seconds in \"world\":",
+						"every minecraft hour in \"flatworld\":",
+						"every tick in \"world\": # can cause lag depending on the code inside the event",
+						"every minecraft days in \"plots\":")
+				.since("1.0")
 				.documentationID("eventperiodical");
 	}
 	
-	@SuppressWarnings("NotNullFieldNotInitialized")
+	@SuppressWarnings("null")
 	private Timespan period;
-
-	@SuppressWarnings("NotNullFieldNotInitialized")
+	
+	@Nullable
+	private Trigger t;
+	@Nullable
 	private int[] taskIDs;
-
-	private World @Nullable [] worlds;
-
-	@Override
+	
+	@Nullable
+	private transient World[] worlds;
+	
+//	@Nullable
+//	private String[] worldNames;
+	
 	@SuppressWarnings("unchecked")
-	public boolean init(Literal<?>[] args, int matchedPattern, ParseResult parseResult) {
+	@Override
+	public boolean init(final Literal<?>[] args, final int matchedPattern, final ParseResult parser) {
 		period = ((Literal<Timespan>) args[0]).getSingle();
-		if (args.length > 1 && args[1] != null)
+		if (args.length > 1 && args[1] != null) {
 			worlds = ((Literal<World>) args[1]).getArray();
+//			worldNames = new String[worlds.length];
+//			for (int i = 0; i < worlds.length; i++)
+//				worldNames[i] = worlds[i].getName();
+		}
 		return true;
 	}
-
+	
+	void execute(final @Nullable World w) {
+		final Trigger t = this.t;
+		if (t == null) {
+			assert false;
+			return;
+		}
+		final ScheduledEvent e = w == null ? new ScheduledNoWorldEvent() : new ScheduledEvent(w);
+		SkriptEventHandler.logEventStart(e);
+		SkriptEventHandler.logTriggerStart(t);
+		t.execute(e);
+		SkriptEventHandler.logTriggerEnd(t);
+		SkriptEventHandler.logEventEnd();
+	}
+	
+	@SuppressWarnings("null")
 	@Override
-	public boolean postLoad() {
-		long ticks = period.getTicks();
-
+	public void register(final Trigger t) {
+		this.t = t;
+		int[] taskIDs;
 		if (worlds == null) {
-			taskIDs = new int[]{
-				Bukkit.getScheduler().scheduleSyncRepeatingTask(
-					Skript.getInstance(), () -> execute(null), ticks, ticks
-				)
-			};
+			taskIDs = new int[] {Bukkit.getScheduler().scheduleSyncRepeatingTask(Skript.getInstance(), new Runnable() {
+				@Override
+				public void run() {
+					execute(null);
+				}
+			}, period.getTicks_i(), period.getTicks_i())};
 		} else {
 			taskIDs = new int[worlds.length];
 			for (int i = 0; i < worlds.length; i++) {
-				World world = worlds[i];
-				taskIDs[i] = Bukkit.getScheduler().scheduleSyncRepeatingTask(
-					Skript.getInstance(), () -> execute(world), ticks - (world.getFullTime() % ticks), ticks
-				);
+				final World w = worlds[i];
+				taskIDs[i] = Bukkit.getScheduler().scheduleSyncRepeatingTask(Skript.getInstance(), new Runnable() {
+					@Override
+					public void run() {
+						execute(w);
+					}
+				}, period.getTicks_i() - (w.getFullTime() % period.getTicks_i()), period.getTicks_i());
+				assert worlds != null; // FindBugs
 			}
 		}
-
-		return true;
+		this.taskIDs = taskIDs;
 	}
-
+	
 	@Override
-	public void unload() {
-		for (int taskID : taskIDs)
+	public void unregister(final Trigger t) {
+		assert t == this.t;
+		this.t = null;
+		assert taskIDs != null;
+		for (final int taskID : taskIDs)
 			Bukkit.getScheduler().cancelTask(taskID);
 	}
-
+	
 	@Override
-	public boolean check(Event event) {
-		throw new UnsupportedOperationException();
+	public void unregisterAll() {
+		t = null;
+		assert taskIDs != null;
+		for (final int taskID : taskIDs)
+			Bukkit.getScheduler().cancelTask(taskID);
 	}
-
+	
 	@Override
-	public boolean isEventPrioritySupported() {
-		return false;
-	}
-
-	@Override
-	public String toString(@Nullable Event event, boolean debug) {
+	public String toString(final @Nullable Event e, final boolean debug) {
 		return "every " + period;
 	}
-
-	private void execute(@Nullable World world) {
-		ScheduledEvent event = world == null ? new ScheduledNoWorldEvent() : new ScheduledEvent(world);
-		SkriptEventHandler.logEventStart(event);
-		SkriptEventHandler.logTriggerStart(trigger);
-		trigger.execute(event);
-		SkriptEventHandler.logTriggerEnd(trigger);
-		SkriptEventHandler.logEventEnd();
-	}
-
+	
 }

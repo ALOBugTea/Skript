@@ -61,7 +61,7 @@ public abstract class SQLStorage extends VariablesStorage {
 
 	@Nullable
 	private String formattedCreateQuery;
-	private final String createTableQuery;
+	private final String query;
 	private String tableName;
 
 	final SynchronizedReference<Database> db = new SynchronizedReference<>(null);
@@ -76,15 +76,9 @@ public abstract class SQLStorage extends VariablesStorage {
 	 */
 	private final static long TRANSACTION_DELAY = 500;
 
-	/**
-	 * Creates a SQLStorage with a create table query.
-	 * 
-	 * @param name The name to be sent through this constructor when newInstance creates this class.
-	 * @param createTableQuery The create table query to send to the SQL engine.
-	 */
-	public SQLStorage(String name, String createTableQuery) {
+	protected SQLStorage(String name, String query) {
 		super(name);
-		this.createTableQuery = createTableQuery;
+		this.query = query;
 		this.tableName = "variables21";
 	}
 
@@ -96,14 +90,7 @@ public abstract class SQLStorage extends VariablesStorage {
 		this.tableName = tableName;
 	}
 
-	/**
-	 * Initializes an SQL database with the user provided configuration section for loading the database.
-	 * 
-	 * @param config The configuration from the config.sk that defines this database.
-	 * @return A Database implementation from SQLibrary.
-	 */
-	@Nullable
-	public abstract Database initialize(SectionNode config);
+	public abstract Object initialize(SectionNode config);
 
 	/**
 	 * Retrieve the create query with the tableName in it
@@ -112,7 +99,7 @@ public abstract class SQLStorage extends VariablesStorage {
 	@Nullable
 	public String getFormattedCreateQuery() {
 		if (formattedCreateQuery == null)
-			formattedCreateQuery = String.format(createTableQuery, tableName);
+			formattedCreateQuery = String.format(query, tableName);
 		return formattedCreateQuery;
 	}
 
@@ -138,10 +125,10 @@ public abstract class SQLStorage extends VariablesStorage {
 
 			final Database db;
 			try {
-				Database database = initialize(n);
-				if (database == null)
+				final Object o = initialize(n);
+				if (o == null)
 					return false;
-				this.db.set(db = database);
+				this.db.set(db = (Database) o);
 			} catch (final RuntimeException e) {
 				if (e instanceof DatabaseException) {// not in a catch clause to not produce a ClassNotFoundException when this class is loaded and SQLibrary is not present
 					Skript.error(e.getLocalizedMessage());
@@ -168,7 +155,7 @@ public abstract class SQLStorage extends VariablesStorage {
 					db.query(getFormattedCreateQuery());
 				} catch (final SQLException e) {
 					Skript.error("Could not create the variables table '" + tableName + "' in the database '" + databaseName + "': " + e.getLocalizedMessage() + ". "
-							+ "Please create the table yourself using the following query: " + String.format(createTableQuery, tableName).replace(",", ", ").replaceAll("\\s+", " "));
+							+ "Please create the table yourself using the following query: " + String.format(query, tableName).replace(",", ", ").replaceAll("\\s+", " "));
 					return false;
 				}
 
