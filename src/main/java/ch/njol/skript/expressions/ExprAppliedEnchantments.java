@@ -65,6 +65,9 @@ public class ExprAppliedEnchantments extends SimpleExpression<EnchantmentType> {
 	@Override
 	@Nullable
 	protected EnchantmentType[] get(Event e) {
+		if (!(e instanceof EnchantItemEvent))
+			return null;
+
 		return ((EnchantItemEvent) e).getEnchantsToAdd().entrySet().stream()
 				.map(entry -> new EnchantmentType(entry.getKey(), entry.getValue()))
 				.toArray(EnchantmentType[]::new);
