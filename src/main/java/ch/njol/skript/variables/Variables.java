@@ -74,7 +74,7 @@ public abstract class Variables {
 	public final static short YGGDRASIL_VERSION = 1;
 	public final static Yggdrasil yggdrasil = new Yggdrasil(YGGDRASIL_VERSION);
 
-	private final static Multimap<Class<? extends VariablesStorage>, String> types = HashMultimap.create();
+	private final static Multimap<String, Class<? extends VariablesStorage>> types = HashMultimap.create();
 
 	static {
 		registerStorage(FlatFileStorage.class, "csv", "file", "flatfile");
@@ -128,14 +128,14 @@ public abstract class Variables {
 	 * @return if the operation was successful, or if it's already registered.
 	 */
 	public static <T extends VariablesStorage> boolean registerStorage(Class<T> storage, String... names) {
-		if (types.containsKey(storage))
-			return false;
 		for (String name : names) {
-			if (types.containsValue(name.toLowerCase(Locale.ENGLISH)))
+			if (types.containsKey(name))
+				return false;
+			if (types.keySet().contains(name.toLowerCase(Locale.US)))
 				return false;
 		}
 		for (String name : names)
-			types.put(storage, name.toLowerCase(Locale.ENGLISH));
+			types.put(name.toLowerCase(Locale.US), storage);
 		return true;
 	}
 
@@ -179,10 +179,10 @@ public abstract class Variables {
 			}
 		};
 		loadingLoggerThread.start();
-		
+
 		try {
 			boolean successful = true;
-			for (Node node : (SectionNode) databases) {
+			for (final Node node : (SectionNode) databases) {
 				if (node instanceof SectionNode) {
 					SectionNode section = (SectionNode) node;
 					String type = section.getValue("type");
@@ -191,13 +191,13 @@ public abstract class Variables {
 						successful = false;
 						continue;
 					}
-					
+
 					String name = section.getKey();
 					assert name != null;
 					VariablesStorage storage;
 					Optional<?> optional = types.entries().stream()
-							.filter(entry -> entry.getValue().equalsIgnoreCase(type))
-							.map(entry -> entry.getKey())
+							.filter(entry -> entry.getKey().equalsIgnoreCase(type))
+							.map(entry -> entry.getValue())
 							.findFirst();
 					if (!optional.isPresent()) {
 						if (!type.equalsIgnoreCase("disabled") && !type.equalsIgnoreCase("none")) {

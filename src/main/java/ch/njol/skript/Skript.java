@@ -90,7 +90,6 @@ import ch.njol.util.coll.CollectionUtils;
 import ch.njol.util.coll.iterator.CheckedIterator;
 import ch.njol.util.coll.iterator.EnumerationIterable;
 import com.google.gson.Gson;
-
 import org.bstats.bukkit.Metrics;
 import org.bstats.charts.SimplePie;
 import org.bukkit.Bukkit;
@@ -569,50 +568,44 @@ public final class Skript extends JavaPlugin implements Listener {
 				
 				Documentation.generate(); // TODO move to test classes?
 				
-				// Variables
-				Bukkit.getScheduler().scheduleSyncDelayedTask(Skript.this, () -> {
-					if (logNormal())
-						info("Loading variables...");
-					final long vls = System.currentTimeMillis();
+				if (logNormal())
+					info("Loading variables...");
+				final long vls = System.currentTimeMillis();
 
-					LogHandler h = SkriptLogger.startLogHandler(new ErrorDescLogHandler() {
-						@Override
-						public LogResult log(final LogEntry entry) {
-							super.log(entry);
-							if (entry.level.intValue() >= Level.SEVERE.intValue()) {
-								logEx(entry.message); // no [Skript] prefix
-								return LogResult.DO_NOT_LOG;
-							} else {
-								return LogResult.LOG;
-							}
+				LogHandler h = SkriptLogger.startLogHandler(new ErrorDescLogHandler() {
+					@Override
+					public LogResult log(final LogEntry entry) {
+						super.log(entry);
+						if (entry.level.intValue() >= Level.SEVERE.intValue()) {
+							logEx(entry.message); // no [Skript] prefix
+							return LogResult.DO_NOT_LOG;
+						} else {
+							return LogResult.LOG;
 						}
-
-						@Override
-						protected void beforeErrors() {
-							logEx();
-							logEx("===!!!=== Skript variable load error ===!!!===");
-							logEx("Unable to load (all) variables:");
-						}
-
-						@Override
-						protected void afterErrors() {
-							logEx();
-							logEx("Skript will work properly, but old variables might not be available at all and new ones may or may not be saved until Skript is able to create a backup of the old file and/or is able to connect to the database (which requires a restart of Skript)!");
-							logEx();
-						}
-					});
-
-					try (CountingLogHandler c = new CountingLogHandler(SkriptLogger.SEVERE).start()) {
-						if (!Variables.load())
-							if (c.getCount() == 0)
-								error("(no information available)");
-					} finally {
-						h.stop();
 					}
-					final long vld = System.currentTimeMillis() - vls;
-					if (logNormal())
-						info("Loaded " + Variables.numVariables() + " variables in " + ((vld / 100) / 10.) + " seconds");
+
+					@Override
+					protected void beforeErrors() {
+						logEx();
+						logEx("===!!!=== Skript variable load error ===!!!===");
+						logEx("Unable to load (all) variables:");
+					}
+
+					@Override
+					protected void afterErrors() {
+						logEx();
+						logEx("Skript will work properly, but old variables might not be available at all and new ones may or may not be saved until Skript is able to create a backup of the old file and/or is able to connect to the database (which requires a restart of Skript)!");
+						logEx();
+					}
 				});
+
+				try (CountingLogHandler c = new CountingLogHandler(SkriptLogger.SEVERE).start()) {
+					if (!Variables.load())
+						if (c.getCount() == 0)
+							error("(no information available)");
+				} finally {
+					h.stop();
+				}
 				
 				// Skript initialization done
 				debug("Early init done");
@@ -655,12 +648,20 @@ public final class Skript extends JavaPlugin implements Listener {
 								Skript.exception(e, "Failed to write test results.");
 							}
 							info("Testing done, shutting down the server.");
-							Bukkit.getServer().shutdown();
+							// Delay server shutdown to stop the server from crashing because the current tick takes a long time due to all the tests
+							Bukkit.getScheduler().runTaskLater(Skript.this, () -> {
+								Bukkit.getServer().shutdown();
+							}, 5);
+
 						}
 
 						return;
 					}
 				}, 100);
+
+				final long vld = System.currentTimeMillis() - vls;
+				if (logNormal())
+					info("Loaded " + Variables.numVariables() + " variables in " + ((vld / 100) / 10.) + " seconds");
 
 				// Enable metrics and register custom charts
 				Metrics metrics = new Metrics(Skript.this, 722); // 722 is our bStats plugin ID
