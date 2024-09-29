@@ -69,10 +69,12 @@ import ch.njol.yggdrasil.Yggdrasil;
 
 public abstract class Variables {
 
+	// Field order matters!
+
 	public final static short YGGDRASIL_VERSION = 1;
 	public final static Yggdrasil yggdrasil = new Yggdrasil(YGGDRASIL_VERSION);
 
-	private final static Multimap<String, Class<? extends VariablesStorage>> types = HashMultimap.create();
+	private final static Multimap<Class<? extends VariablesStorage>, String> types = HashMultimap.create();
 
 	static {
 		registerStorage(FlatFileStorage.class, "csv", "file", "flatfile");
@@ -95,21 +97,21 @@ public abstract class Variables {
 			@Nullable
 			public String getID(final @NonNull Class<?> c) {
 				if (ConfigurationSerializable.class.isAssignableFrom(c) && Classes.getSuperClassInfo(c) == Classes.getExactClassInfo(Object.class))
-					return configurationSerializablePrefix + ConfigurationSerialization.getAlias((Class<? extends ConfigurationSerializable>) c);
+					return CONFIGURATION_SERIALIZABLE_PREFIX + ConfigurationSerialization.getAlias((Class<? extends ConfigurationSerializable>) c);
 				return null;
 			}
 			
 			@Override
 			@Nullable
 			public Class<? extends ConfigurationSerializable> getClass(final @NonNull String id) {
-				if (id.startsWith(configurationSerializablePrefix))
-					return ConfigurationSerialization.getClassByAlias(id.substring(configurationSerializablePrefix.length()));
+				if (id.startsWith(CONFIGURATION_SERIALIZABLE_PREFIX))
+					return ConfigurationSerialization.getClassByAlias(id.substring(CONFIGURATION_SERIALIZABLE_PREFIX.length()));
 				return null;
 			}
 		});
 	}
 
-	private final static String configurationSerializablePrefix = "ConfigurationSerializable_";
+	private final static String CONFIGURATION_SERIALIZABLE_PREFIX = "ConfigurationSerializable_";
 
 	final static List<VariablesStorage> storages = new ArrayList<>();
 
@@ -126,14 +128,14 @@ public abstract class Variables {
 	 * @return if the operation was successful, or if it's already registered.
 	 */
 	public static <T extends VariablesStorage> boolean registerStorage(Class<T> storage, String... names) {
+		if (types.containsKey(storage))
+			return false;
 		for (String name : names) {
-			if (types.containsKey(name))
-				return false;
-			if (types.keySet().contains(name.toLowerCase(Locale.US)))
+			if (types.containsValue(name.toLowerCase(Locale.ENGLISH)))
 				return false;
 		}
 		for (String name : names)
-			types.put(name.toLowerCase(Locale.US), storage);
+			types.put(storage, name.toLowerCase(Locale.ENGLISH));
 		return true;
 	}
 
@@ -180,7 +182,7 @@ public abstract class Variables {
 		
 		try {
 			boolean successful = true;
-			for (final Node node : (SectionNode) databases) {
+			for (Node node : (SectionNode) databases) {
 				if (node instanceof SectionNode) {
 					SectionNode section = (SectionNode) node;
 					String type = section.getValue("type");
@@ -194,8 +196,8 @@ public abstract class Variables {
 					assert name != null;
 					VariablesStorage storage;
 					Optional<?> optional = types.entries().stream()
-							.filter(entry -> entry.getKey().equalsIgnoreCase(type))
-							.map(entry -> entry.getValue())
+							.filter(entry -> entry.getValue().equalsIgnoreCase(type))
+							.map(entry -> entry.getKey())
 							.findFirst();
 					if (!optional.isPresent()) {
 						if (!type.equalsIgnoreCase("disabled") && !type.equalsIgnoreCase("none")) {
