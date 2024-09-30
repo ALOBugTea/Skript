@@ -169,6 +169,13 @@ public final class Skript extends JavaPlugin implements Listener {
 	private static boolean disabled = false;
 	private static boolean partDisabled = false;
 
+	private static long timeWhenDisabled = 0;
+	public static boolean isTimeWhenDisabledAfter5minutes() {
+		if (timeWhenDisabled == 0)
+			return false;
+		return System.currentTimeMillis() - timeWhenDisabled > 5 * 60 * 1000;
+	}
+
 	public static Skript getInstance() {
 		final Skript i = instance;
 		if (i == null)
@@ -871,6 +878,7 @@ public final class Skript extends JavaPlugin implements Listener {
 	public void onDisable() {
 		if (disabled)
 			return;
+		timeWhenDisabled = System.currentTimeMillis();
 		disabled = true;
 
 		if (!partDisabled) {
