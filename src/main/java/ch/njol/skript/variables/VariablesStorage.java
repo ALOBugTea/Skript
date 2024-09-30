@@ -200,7 +200,7 @@ public abstract class VariablesStorage implements Closeable {
 
 			this.file = getFile(fileName).getAbsoluteFile();
 
-            if (file.exists() && !file.isFile()) {
+			if (file.exists() && !file.isFile()) {
 				Skript.error("The database file '" + file.getName() + "' must be an actual file, not a directory.");
 				return false;
 			}
@@ -313,10 +313,10 @@ public abstract class VariablesStorage implements Closeable {
 	@SuppressWarnings("null")
 	public void startBackupTask(Timespan backupInterval) {
 		// File is null or backup interval is invalid
-		if (file == null || backupInterval.getTicks() == 0)
+		if (file == null || backupInterval.getTicks_i() == 0)
 			return;
 
-		backupTask = new Task(Skript.getInstance(), backupInterval.getTicks(), backupInterval.getTicks(), true) {
+		backupTask = new Task(Skript.getInstance(), backupInterval.getTicks_i(), backupInterval.getTicks_i(), true) {
 			@Override
 			public void run() {
 				synchronized (connectionLock) {
@@ -344,11 +344,12 @@ public abstract class VariablesStorage implements Closeable {
 	 *
 	 * @see #variableNamePattern
 	 */
+	@SuppressWarnings("null")
 	boolean accept(@Nullable String var) {
 		if (var == null)
 			return false;
 
-		return variableNamePattern != null ? variableNamePattern.matcher(var).matches() : true;
+		return variableNamePattern == null || variableNamePattern.matcher(var).matches();
 	}
 
 	/**
@@ -379,23 +380,6 @@ public abstract class VariablesStorage implements Closeable {
 	 * @param var the serialized variable.
 	 */
 	final void save(SerializedVariable var) {
-		try {
-			if (!Skript.getInstance().isEnabled())
-				Skript.warning("variable '" + var.name + "' trying to save when Skript is disabled");
-		} catch (NullPointerException ignored){
-			// Ignore null pointer exceptions during serialization
-			Object value = "null";
-			if (var.value != null) {
-				try {
-					value = var.value.toString(); // 尝试将 value 转为字符串
-				} catch (Exception e) {
-					value = "unavailable (toString() threw exception)"; // 处理 toString 抛出的异常
-				}
-			}
-			if (!Skript.getInstance().isEnabled())
-					Skript.warning("variable 'null' trying to save " + value + " when Skript is disabled");
-            return;
-		}
 		if (changesQueue.size() > FIRST_WARNING && lastWarning < System.currentTimeMillis() - WARNING_INTERVAL * 1000) {
 			// Too many variables queued up to save, warn the server
 			Skript.warning("Cannot write variables to the database '" + databaseName + "' at sufficient speed; " +
