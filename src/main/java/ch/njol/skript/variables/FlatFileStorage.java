@@ -275,11 +275,17 @@ public class FlatFileStorage extends VariablesStorage {
 		saveTask = new Task(Skript.getInstance(), SAVE_TASK_DELAY, SAVE_TASK_PERIOD, true) {
 			@Override
 			public void run() {
+				// FIXME: VERY BIG ISSUE without locked, May cause CPU Usage too much!
 				// Due to concurrency, the amount of changes may change between the get and set call
 				//  but that's not a big issue
 				if (changes.get() >= REQUIRED_CHANGES_FOR_RESAVE) {
-					saveVariables(false);
-					changes.set(0);
+					try {
+						Variables.getReadLock().lock();
+						saveVariables(false);
+						changes.set(0);
+					} finally {
+						Variables.getReadLock().unlock();
+					}
 				}
 			}
 		};
