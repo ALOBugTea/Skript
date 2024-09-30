@@ -334,14 +334,15 @@ public class VariableString implements Expression<String> {
 		} else {
 			pattern = Pattern.compile(Pattern.quote(name));
 		}
-		if (!SkriptConfig.disableVariableConflictWarnings.value()) {
-			for (final Entry<String, Pattern> e : variableNames.entrySet()) {
-				if (e.getValue().matcher(name).matches() || pattern.matcher(e.getKey()).matches()) {
-					Skript.warning("Possible name conflict of variables {" + name + "} and {" + e.getKey() + "} (there might be more conflicts).");
-					break;
-				}
-			}
-		}
+		// TODO: Removed this Physically when conflicting variables appear
+//		if (!SkriptConfig.disableVariableConflictWarnings.value()) {
+//			for (final Entry<String, Pattern> e : variableNames.entrySet()) {
+//				if (e.getValue().matcher(name).matches() || pattern.matcher(e.getKey()).matches()) {
+//					Skript.warning("Possible name conflict of variables {" + name + "} and {" + e.getKey() + "} (there might be more conflicts).");
+//					break;
+//				}
+//			}
+//		}
 		variableNames.put(name, pattern);
 	}
 	
