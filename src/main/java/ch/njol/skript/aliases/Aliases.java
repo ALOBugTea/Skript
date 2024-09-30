@@ -627,12 +627,13 @@ public abstract class Aliases {
 				}
 				d = d.intersection(data);
 			}
-			if (!isAlias && d != null) {
-				Skript.warning("Using an ID instead of an alias is discouraged and will likely not be supported in future versions of Skript anymore. " +
-						(d.toString().equals(type) ?
-								"Please create an alias for '" + type + (type.equals(s) ? "" : " or '" + s + "'") + "' (" + Material.getMaterial(d.getId()).name() + ") in aliases-english.sk or the script's aliases section and use that instead." :
-								"Please replace '" + s + "' with e.g. '" + d.toString(true, false) + "'."));
-			}
+			// TODO: Removed this Physically when ID warning is appear
+//			if (!isAlias && d != null) {
+//				Skript.warning("Using an ID instead of an alias is discouraged and will likely not be supported in future versions of Skript anymore. " +
+//						(d.toString().equals(type) ?
+//								"Please create an alias for '" + type + (type.equals(s) ? "" : " or '" + s + "'") + "' (" + Material.getMaterial(d.getId()).name() + ") in aliases-english.sk or the script's aliases section and use that instead." :
+//								"Please replace '" + s + "' with e.g. '" + d.toString(true, false) + "'."));
+//			}
 			t.add(d);
 			return t;
 		} else if ((i = getAlias(type)) != null) {

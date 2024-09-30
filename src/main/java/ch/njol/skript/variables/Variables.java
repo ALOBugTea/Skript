@@ -22,6 +22,7 @@ package ch.njol.skript.variables;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.Lock;
@@ -830,6 +831,11 @@ public class Variables {
 		// First, make sure all variables are saved
 		while (saveQueue.size() > 0) {
 			try {
+				if (Skript.isTimeWhenDisabledAfter5minutes()) {
+					Skript.error("Variables are still being saved while Skript is disabled. " +
+							"but 5 minutes was gone, " + saveQueue.size() != null ? String.valueOf(saveQueue.size()) : "'can't get number left of changeQueue'" + " variables remain to be dispensed.");
+					break;
+				}
 				Thread.sleep(10);
 			} catch (InterruptedException ignored) {}
 		}
