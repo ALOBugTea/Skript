@@ -428,7 +428,7 @@ public abstract class VariablesStorage implements Closeable {
 			try {
 				if (Skript.isTimeWhenDisabledAfter5minutes()) {
 					Skript.error("Variables are still being saved while Skript is disabled. " +
-                        "but 5 minutes was gone, " + changesQueue.size() != null ? String.valueOf(changesQueue.size()) : "'can't get number left of changeQueue'" + " variables remain to be dispensed.");
+                        "but 5 minutes was gone, " + changesQueue.size() + " variables remain to be dispensed.");
 					break;
 				}
 				Thread.sleep(10);

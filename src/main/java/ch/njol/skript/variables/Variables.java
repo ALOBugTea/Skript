@@ -841,7 +841,8 @@ public class Variables {
 			try {
 				if (Skript.isTimeWhenDisabledAfter5minutes()) {
 					Skript.error("Variables are still being saved while Skript is disabled. " +
-							"but 5 minutes was gone, " + saveQueue.size() != null ? String.valueOf(saveQueue.size()) : "'can't get number left of changeQueue'" + " variables remain to be dispensed.");
+							"but 5 minutes was gone, " + saveQueue.size() +
+							" variables remain to be dispensed.");
 					break;
 				}
 				Thread.sleep(10);
