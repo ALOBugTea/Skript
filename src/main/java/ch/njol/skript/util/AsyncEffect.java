@@ -44,6 +44,7 @@ public abstract class AsyncEffect extends Effect {
 
 	@Override
 	@Nullable
+	@SuppressWarnings("null")
 	protected TriggerItem walk(Event e) {
 		debug(e, true);
 
