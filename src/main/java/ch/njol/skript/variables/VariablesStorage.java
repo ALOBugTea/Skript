@@ -200,7 +200,7 @@ public abstract class VariablesStorage implements Closeable {
 
 			this.file = getFile(fileName).getAbsoluteFile();
 
-			if (file.exists() && !file.isFile()) {
+            if (file.exists() && !file.isFile()) {
 				Skript.error("The database file '" + file.getName() + "' must be an actual file, not a directory.");
 				return false;
 			}
@@ -313,10 +313,10 @@ public abstract class VariablesStorage implements Closeable {
 	@SuppressWarnings("null")
 	public void startBackupTask(Timespan backupInterval) {
 		// File is null or backup interval is invalid
-		if (file == null || backupInterval.getTicks_i() == 0)
+		if (file == null || backupInterval.getTicks() == 0)
 			return;
 
-		backupTask = new Task(Skript.getInstance(), backupInterval.getTicks_i(), backupInterval.getTicks_i(), true) {
+		backupTask = new Task(Skript.getInstance(), backupInterval.getTicks(), backupInterval.getTicks(), true) {
 			@Override
 			public void run() {
 				synchronized (connectionLock) {
@@ -344,12 +344,11 @@ public abstract class VariablesStorage implements Closeable {
 	 *
 	 * @see #variableNamePattern
 	 */
-	@SuppressWarnings("null")
 	boolean accept(@Nullable String var) {
 		if (var == null)
 			return false;
 
-		return variableNamePattern == null || variableNamePattern.matcher(var).matches();
+		return variableNamePattern != null ? variableNamePattern.matcher(var).matches() : true;
 	}
 
 	/**
