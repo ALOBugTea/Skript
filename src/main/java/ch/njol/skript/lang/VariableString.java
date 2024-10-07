@@ -353,15 +353,15 @@ public class VariableString implements Expression<String> {
 	 * @param start Index after the opening bracket
 	 * @return The next closing curly bracket
 	 */
-	public static int nextVariableBracket(final String s, final int start) {
-		int n = 0;
-		for (int i = start; i < s.length(); i++) {
-			if (s.charAt(i) == '}') {
-				if (n == 0)
-					return i;
-				n--;
-			} else if (s.charAt(i) == '{') {
-				n++;
+	public static int nextVariableBracket(String string, int start) {
+		int variableDepth = 0;
+		for (int index = start; index < string.length(); index++) {
+			if (string.charAt(index) == '}') {
+				if (variableDepth == 0)
+					return index;
+				variableDepth--;
+			} else if (string.charAt(index) == '{') {
+				variableDepth++;
 			}
 		}
 		return -1;
@@ -370,10 +370,10 @@ public class VariableString implements Expression<String> {
 	public static VariableString[] makeStrings(final String[] args) {
 		VariableString[] strings = new VariableString[args.length];
 		int j = 0;
-		for (int i = 0; i < args.length; i++) {
-			final VariableString vs = newInstance("" + args[i]);
-			if (vs != null)
-				strings[j++] = vs;
+		for (String arg : args) {
+			VariableString variableString = newInstance(arg);
+			if (variableString != null)
+				strings[j++] = variableString;
 		}
 		if (j != args.length)
 			strings = Arrays.copyOf(strings, j);
