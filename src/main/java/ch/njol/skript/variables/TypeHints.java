@@ -51,6 +51,10 @@ public class TypeHints {
 		if (hint.equals(Object.class)) // Ignore useless type hint
 			return;
 
+		if (typeHints.isEmpty()) {
+			clear(); // Reinitialize the stack if it's empty
+		}
+
 		// Take top of stack, without removing it
 		Map<String, Class<?>> hints = typeHints.getFirst();
 		hints.put(variable, hint);
