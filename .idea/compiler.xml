@@ -2,6 +2,9 @@
 <project version="4">
   <component name="CompilerConfiguration">
     <bytecodeTargetLevel>
+      <module name="Skript-fork" target="1.8" />
+      <module name="Skript-fork.main" target="1.8" />
+      <module name="Skript-fork.test" target="1.8" />
       <module name="Skript_main" target="1.8" />
       <module name="Skript_test" target="1.8" />
     </bytecodeTargetLevel>
