@@ -104,19 +104,10 @@ public class EffReturn extends Effect {
 	@Nullable
 	protected TriggerItem walk(final Event e) {
 		debug(e, false);
-		if (e instanceof FunctionEvent) {
+		if (e instanceof FunctionEvent)
 			((ScriptFunction) function).setReturnValue((FunctionEvent) e, value.getArray(e));
-		}else{
+		else
 			assert false : e;
-		}
-
-		TriggerSection parent = getParent();
-		while (parent != null) {
-			if (parent instanceof Loop)
-				((Loop) parent).exit(e);
-			parent = parent.getParent();
-		}
-
 		return null;
 	}
 	

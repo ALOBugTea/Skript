@@ -698,30 +698,21 @@ public class BukkitClasses {
 				.parser(new Parser<Player>() {
 					@Override
 					@Nullable
-					public Player parse(String string, ParseContext context) {
+					public Player parse(final String s, final ParseContext context) {
 						if (context == ParseContext.COMMAND) {
-							if (string.isEmpty())
-								return null;
-							if (string.matches("(?i)[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}"))
-								return Bukkit.getPlayer(UUID.fromString(string));
-							String name = string.toLowerCase(Locale.ENGLISH);
-							int nameLength = name.length(); // caching
-							List<Player> players = new ArrayList<>();
-							for (Player player : Bukkit.getOnlinePlayers()) {
-								if (player.getName().toLowerCase(Locale.ENGLISH).startsWith(name)) {
-									if (player.getName().length() == nameLength) // a little better in performance than String#equals()
-										return player;
-									players.add(player);
-								}
-							}
-							if (players.size() == 1)
-								return players.get(0);
-							if (players.size() == 0)
-								Skript.error(String.format(Language.get("commands.no player starts with"), string));
+							if (s.matches("(?i)[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}"))
+								return Bukkit.getPlayer(UUID.fromString(s));
+							final List<Player> ps = Bukkit.matchPlayer(s);
+							if (ps.size() == 1)
+								return ps.get(0);
+							if (ps.size() == 0)
+								Skript.error(String.format(Language.get("commands.no player starts with"), s));
 							else
-								Skript.error(String.format(Language.get("commands.multiple players start with"), string));
+								Skript.error(String.format(Language.get("commands.multiple players start with"), s));
 							return null;
 						}
+						// if (s.matches("\"\\S+\""))
+						// 	return Bukkit.getPlayerExact(s.substring(1, s.length() - 1));
 						assert false;
 						return null;
 					}

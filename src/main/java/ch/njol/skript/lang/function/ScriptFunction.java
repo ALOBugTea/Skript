@@ -91,6 +91,7 @@ public class ScriptFunction<T> extends Function<T> {
 		
 		assert trigger != null;
 		trigger.execute(e);
+		returnValueSet = false;
 		return returnValue;
 	}
 
