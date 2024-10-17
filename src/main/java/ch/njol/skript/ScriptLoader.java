@@ -39,7 +39,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.regex.Matcher;
 
-import ch.njol.skript.variables.TypeHints;
 import org.bukkit.Bukkit;
 import org.bukkit.event.Event;
 import org.eclipse.jdt.annotation.Nullable;
@@ -141,7 +140,6 @@ final public class ScriptLoader {
 		currentEventName = null;
 		currentEvents = null;
 		hasDelayBefore = Kleenean.FALSE;
-		TypeHints.clear(); // Local variables are local to event
 	}
 	
 	public static List<TriggerSection> currentSections = new ArrayList<>();
@@ -926,7 +924,6 @@ final public class ScriptLoader {
 				String name = replaceOptions("" + n.getKey());
 				if (!SkriptParser.validateLine(name))
 					continue;
-				TypeHints.enterScope(); // Begin conditional type hints
 
 				if (StringUtils.startsWithIgnoreCase(name, "loop ")) {
 					final String l = "" + name.substring("loop ".length());
@@ -1005,8 +1002,6 @@ final public class ScriptLoader {
 					hasDelayBefore = hadDelayBefore.or(hasDelayBefore.and(Kleenean.UNKNOWN));
 				}
 
-				// Destroy these conditional type hints
-				TypeHints.exitScope();
 			}
 		}
 		

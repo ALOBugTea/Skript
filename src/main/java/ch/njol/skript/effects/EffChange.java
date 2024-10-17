@@ -23,7 +23,6 @@ import java.util.Arrays;
 import java.util.logging.Level;
 
 import ch.njol.skript.lang.*;
-import ch.njol.skript.variables.TypeHints;
 import org.bukkit.event.Event;
 import org.eclipse.jdt.annotation.Nullable;
 
@@ -256,15 +255,9 @@ public class EffChange extends Effect {
 				Variable<?> variable = (Variable<?>) changed;
 				VariableString name = variable.getName();
 				if (mode == ChangeMode.SET || (variable.isList() && mode == ChangeMode.ADD)) {
-					if (variable.isLocal()) {
-						if (name.isSimple()) // Emit a type hint if possible
-							TypeHints.add(name.toString(), ch.getReturnType());
-					} else {
-						ClassInfo<?> ci = Classes.getSuperClassInfo(ch.getReturnType());
-						if (ci.getC() != Object.class && ci.getSerializer() == null && ci.getSerializeAs() == null && !SkriptConfig.disableObjectCannotBeSavedWarnings.value()) {
-							Skript.warning(ci.getName().withIndefiniteArticle() + " cannot be saved, i.e. the contents of the variable " + changed + " will be lost when the server stops.");
-						}
-					}
+					ClassInfo<?> ci = Classes.getSuperClassInfo(ch.getReturnType());
+					if (ci.getC() != Object.class && ci.getSerializer() == null && ci.getSerializeAs() == null && !SkriptConfig.disableObjectCannotBeSavedWarnings.value())
+						Skript.warning(ci.getName().withIndefiniteArticle() + " cannot be saved, i.e. the contents of the variable " + changed + " will be lost when the server stops.");
 				}
 			}
 		}
