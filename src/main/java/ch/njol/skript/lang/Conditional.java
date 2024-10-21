@@ -19,6 +19,7 @@
  */
 package ch.njol.skript.lang;
 
+import ch.njol.skript.Skript;
 import org.bukkit.event.Event;
 import org.eclipse.jdt.annotation.Nullable;
 
@@ -66,7 +67,11 @@ public class Conditional extends TriggerSection {
 	public void loadElseClause(final SectionNode node) {
 		assert elseClause == null || elseClause instanceof Conditional;
 		if (elseClause != null) {
-			((Conditional) elseClause).loadElseClause(node);
+			if (elseClause instanceof Conditional) { // an 'else if'
+				((Conditional) elseClause).loadElseClause(node);
+			} else {
+				Skript.error("There can be only one 'else' section after an 'if' section. Maybe 'else if' is what you meant?");
+			}
 			return;
 		}
 		elseClause = new TriggerSection(node) {
