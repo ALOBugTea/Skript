@@ -121,7 +121,7 @@ public abstract class VariablesStorage implements Closeable {
 							save(variable.name, null, null);
 					} catch (InterruptedException ignored) {
 						// Ignored as the `closed` field will indicate whether the thread actually needs to stop
-					} catch (final InterruptedException e) {}
+					}
 				}
 			}
 		}, "Skript variable save thread for database '" + name + "'");
