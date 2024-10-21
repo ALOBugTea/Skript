@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.net.URL;
@@ -53,6 +54,7 @@ import java.util.zip.ZipFile;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Server;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
@@ -60,6 +62,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.event.server.ServerCommandEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginDescriptionFile;
@@ -164,7 +167,15 @@ public final class Skript extends JavaPlugin implements Listener {
 	private static Skript instance = null;
 	
 	private static boolean disabled = false;
-	
+	private static boolean partDisabled = false;
+
+	private static long timeWhenDisabled = 0;
+	public static boolean isTimeWhenDisabledAfter5minutes() {
+		if (timeWhenDisabled == 0)
+			return false;
+		return System.currentTimeMillis() - timeWhenDisabled > 5 * 60 * 1000;
+	}
+
 	public static Skript getInstance() {
 		final Skript i = instance;
 		if (i == null)
@@ -192,17 +203,16 @@ public final class Skript extends JavaPlugin implements Listener {
 			m_finished_loading = new Message("skript.finished loading");
 	
 	public static ServerPlatform getServerPlatform() {
-		if (classExists("co.aikar.timings.Timings")) {
+		if (classExists("net.glowstone.GlowServer")) {
+			return ServerPlatform.BUKKIT_GLOWSTONE; // Glowstone has timings too, so must check for it first
+		} else if (classExists("co.aikar.timings.Timings")) {
 			return ServerPlatform.BUKKIT_PAPER; // Could be Sponge, but it doesn't work at all at the moment
 		} else if (classExists("org.spigotmc.SpigotConfig")) {
-			if (classExists("java.net.glowstone.GlowServer")) {
-				return ServerPlatform.BUKKIT_GLOWSTONE;
-			} else {
-				return ServerPlatform.BUKKIT_SPIGOT;
-			}
-		} else if (classExists("org.bukkit.craftbukkit.CraftServer")) {
+			return ServerPlatform.BUKKIT_SPIGOT;
+		} else if (classExists("org.bukkit.craftbukkit.CraftServer") || classExists("org.bukkit.craftbukkit.Main")) {
+			// At some point, CraftServer got removed or moved
 			return ServerPlatform.BUKKIT_CRAFTBUKKIT;
-		} else {
+		} else { // Probably some ancient Bukkit implementation
 			return ServerPlatform.BUKKIT_UNKNOWN;
 		}
 	}
@@ -230,12 +240,13 @@ public final class Skript extends JavaPlugin implements Listener {
 	
 	@Override
 	public void onEnable() {
+		Bukkit.getPluginManager().registerEvents(this, this);
 		if (disabled) {
 			Skript.error(m_invalid_reload.toString());
 			setEnabled(false);
 			return;
 		}
-		
+
 		
 		ChatMessages.registerListeners();
 		Language.loadDefault(getAddonInstance());
@@ -772,17 +783,108 @@ public final class Skript extends JavaPlugin implements Listener {
 	public static void closeOnDisable(final Closeable closeable) {
 		closeOnDisable.add(closeable);
 	}
-	
+
+	@SuppressWarnings("unused")
+	@EventHandler
+	public void onPluginDisable(PluginDisableEvent event) {
+		Plugin plugin = event.getPlugin();
+		PluginDescriptionFile descriptionFile = plugin.getDescription();
+		if (descriptionFile.getDepend().contains("Skript") || descriptionFile.getSoftDepend().contains("Skript")) {
+			// An addon being disabled, check if server is being stopped
+			if (!isServerRunning() && !partDisabled) {
+				Skript.info("Part Disabling Skript due to " + plugin.getName() + " being disabled!");
+				beforeDisable();
+			}
+		}
+	}
+	@SuppressWarnings("unused")
+	@EventHandler
+	public void onServerStopByCommand(ServerCommandEvent event) {
+		boolean isStopping = event.getCommand().equalsIgnoreCase("stop") ||
+							 event.getCommand().equalsIgnoreCase("restart");
+		if (isStopping && !isServerStopByCommand) {
+			isServerStopByCommand = true; // Trigger only once time
+        }
+	}
+
+	private static boolean isServerStopByCommand = false;
+
+	private static final boolean IS_STOPPING_EXISTS;
+	@Nullable
+	private static Method IS_RUNNING;
+	@Nullable
+	private static Object MC_SERVER;
+
+	static {
+		IS_STOPPING_EXISTS = methodExists(Server.class, "isStopping");
+
+		if (!IS_STOPPING_EXISTS) {
+			Server server = Bukkit.getServer();
+			if (server != null) {
+				Class<?> clazz = server.getClass();
+
+				Method serverMethod;
+				try {
+					serverMethod = clazz.getMethod("getServer");
+				} catch (NoSuchMethodException e) {
+					throw new RuntimeException(e);
+				}
+
+				try {
+					MC_SERVER = serverMethod.invoke(server);
+				} catch (IllegalAccessException | InvocationTargetException e) {
+					throw new RuntimeException(e);
+				}
+
+				try {
+					if (MC_SERVER != null)
+						IS_RUNNING = MC_SERVER.getClass().getMethod("isRunning");
+				} catch (NoSuchMethodException e) {
+					throw new RuntimeException(e);
+				}
+			}
+		}
+	}
+
+	@SuppressWarnings("ConstantConditions")
+	private boolean isServerRunning() {
+
+		// Bukkit.getServer().isStopping() doesn't exists in 1.11.2
+		// So it could be Terrible when Addon trying to disabled self!
+		// but we can't do anything about it here...
+
+//		if (IS_STOPPING_EXISTS)
+//			return !Bukkit.getServer().isStopping();
+
+		try {
+            // Part Disabled wouldn't work if no other method found
+            if (IS_RUNNING != null && MC_SERVER != null)
+				return (boolean) IS_RUNNING.invoke(MC_SERVER);
+			else return !isServerStopByCommand;
+		} catch (IllegalAccessException | InvocationTargetException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+
+	private void beforeDisable() {
+		partDisabled = true;
+		EvtSkript.onSkriptStop(); // TODO [code style] warn user about delays in Skript stop events
+
+		disableScripts(); // This version doesn't have any handle in ScriptLoader, Change back to old usage.
+	}
+
 	@Override
 	public void onDisable() {
 		if (disabled)
 			return;
+		timeWhenDisabled = System.currentTimeMillis();
 		disabled = true;
-		
-		EvtSkript.onSkriptStop(); // TODO [code style] warn user about delays in Skript stop events
-		
-		disableScripts();
-		
+
+		if (!partDisabled) {
+			beforeDisable();
+		}
+
 		Bukkit.getScheduler().cancelTasks(this);
 		
 		for (final Closeable c : closeOnDisable) {
@@ -792,52 +894,7 @@ public final class Skript extends JavaPlugin implements Listener {
 				Skript.exception(e, "An error occurred while shutting down.", "This might or might not cause any issues.");
 			}
 		}
-		
-		// unset static fields to prevent memory leaks as Bukkit reloads the classes with a different classloader on reload
-		// async to not slow down server reload, delayed to not slow down server shutdown
-		final Thread t = newThread(new Runnable() {
-			@SuppressWarnings("synthetic-access")
-			@Override
-			public void run() {
-				try {
-					Thread.sleep(10000);
-				} catch (final InterruptedException e) {}
-				try {
-					final Field modifiers = Field.class.getDeclaredField("modifiers");
-					modifiers.setAccessible(true);
-					final JarFile jar = new JarFile(getFile());
-					try {
-						for (final JarEntry e : new EnumerationIterable<>(jar.entries())) {
-							if (e.getName().endsWith(".class")) {
-								try {
-									final Class<?> c = Class.forName(e.getName().replace('/', '.').substring(0, e.getName().length() - ".class".length()), false, getClassLoader());
-									for (final Field f : c.getDeclaredFields()) {
-										if (Modifier.isStatic(f.getModifiers()) && !f.getType().isPrimitive()) {
-											if (Modifier.isFinal(f.getModifiers())) {
-												modifiers.setInt(f, f.getModifiers() & ~Modifier.FINAL);
-											}
-											f.setAccessible(true);
-											f.set(null, null);
-										}
-									}
-								} catch (final Throwable ex) {
-									if (testing())
-										ex.printStackTrace();
-								}
-							}
-						}
-					} finally {
-						jar.close();
-					}
-				} catch (final Throwable ex) {
-					if (testing())
-						ex.printStackTrace();
-				}
-			}
-		}, "Skript cleanup thread");
-		t.setPriority(Thread.MIN_PRIORITY);
-		t.setDaemon(true);
-		t.start();
+
 	}
 	
 	// ================ CONSTANTS, OPTIONS & OTHER ================
@@ -1240,7 +1297,12 @@ public final class Skript extends JavaPlugin implements Listener {
 	 */
 	private static Map<String, PluginDescriptionFile> pluginPackages = new HashMap<>();
 	private static boolean checkedPlugins = false;
-	
+
+	/**
+	 * Set to true when an exception is thrown.
+	 */
+	private static boolean errored = false;
+
 	/**
 	 * Used if something happens that shouldn't happen
 	 * 
@@ -1249,7 +1311,7 @@ public final class Skript extends JavaPlugin implements Listener {
 	 * @return an EmptyStacktraceException to throw if code execution should terminate.
 	 */
 	public final static EmptyStacktraceException exception(@Nullable Throwable cause, final @Nullable Thread thread, final @Nullable TriggerItem item, final String... info) {
-		
+		errored = true;
 		// First error: gather plugin package information
 		if (!checkedPlugins) { 
 			for (Plugin plugin : Bukkit.getPluginManager().getPlugins()) {

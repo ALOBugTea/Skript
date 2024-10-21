@@ -419,10 +419,10 @@ public class FlatFileStorage extends VariablesStorage {
 	 * Saves the variables.
 	 * <p>
 	 * This method uses the sorted variables map to save the variables in order.
-	 * 
-	 * @param pw
-	 * @param parent The parent's name with {@link Variable#SEPARATOR} at the end
-	 * @param map
+	 *
+	 * @param pw the print writer to write the CSV lines too.
+	 * @param parent The parent's name with {@link Variable#SEPARATOR} at the end.
+	 * @param map the variables map.
 	 */
 	@SuppressWarnings("unchecked")
 	private final void save(final PrintWriter pw, final String parent, final TreeMap<String, Object> map) {
@@ -433,14 +433,19 @@ public class FlatFileStorage extends VariablesStorage {
 			if (val instanceof TreeMap) {
 				save(pw, parent + e.getKey() + Variable.SEPARATOR, (TreeMap<String, Object>) val);
 			} else {
-				final String name = (e.getKey() == null ? parent.substring(0, parent.length() - Variable.SEPARATOR.length()) : parent + e.getKey());
-				for (final VariablesStorage s : Variables.storages) {
-					if (s != this && s.accept(name))
-						continue outer;
+				String name = (e.getKey() == null ? parent.substring(0, parent.length() - Variable.SEPARATOR.length()) : parent + e.getKey());
+				try {
+					for (VariablesStorage s : Variables.storages) {
+						if (s != this && s.accept(name))
+							continue outer;
+					}
+					SerializedVariable.Value value = Classes.serialize(val);
+					if (value != null)
+						writeCSV(pw, name, value.type, encode(value.data));
+				} catch (Exception ex) {
+					//noinspection ThrowableNotThrown
+					Skript.exception(ex, "Error saving variable named " + name);
 				}
-				final SerializedVariable.Value value = Classes.serialize(val);
-				if (value != null)
-					writeCSV(pw, name, value.type, encode(value.data));
 			}
 		}
 	}

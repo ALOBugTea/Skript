@@ -81,7 +81,7 @@ public abstract class Variables {
 			@SuppressWarnings("unchecked")
 			private final void init() {
 				// used by asserts
-				info = (ClassInfo<? extends ConfigurationSerializable>) Classes.getExactClassInfo(Object.class);
+				info = (ClassInfo<? extends ConfigurationSerializable>) (ClassInfo <?>) Classes.getExactClassInfo(Object.class);
 			}
 			
 			@SuppressWarnings({"unchecked"})
@@ -261,7 +261,29 @@ public abstract class Variables {
 	static Lock getReadLock() {
 		return variablesLock.readLock();
 	}
-	
+
+	@Nullable
+	public static VariablesMap removeLocals(Event event) {
+		return localVariables.remove(event);
+	}
+
+	public static void setLocalVariables(Event event, @Nullable Object map) {
+		if (map != null) {
+			localVariables.put(event, (VariablesMap) map);
+		} else {
+			removeLocals(event);
+		}
+	}
+
+	@Nullable
+	public static Object copyLocalVariables(Event event) {
+		VariablesMap from = localVariables.get(event);
+		if (from == null)
+			return null;
+
+		return from.copy();
+	}
+
 	/**
 	 * Returns the internal value of the requested variable.
 	 * <p>
@@ -465,6 +487,12 @@ public abstract class Variables {
 	public static void close() {
 		while (queue.size() > 0) {
 			try {
+				if (Skript.isTimeWhenDisabledAfter5minutes()) {
+					Skript.error("Variables are still being saved while Skript is disabled. " +
+							"but 5 minutes was gone, " + queue.size() +
+							" variables remain to be dispensed.");
+					break;
+				}
 				Thread.sleep(10);
 			} catch (final InterruptedException e) {}
 		}
